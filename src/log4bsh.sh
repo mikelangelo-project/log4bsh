@@ -251,6 +251,7 @@ REDIRECTION_ENABLED=false;
 # Parameter
 #  $1: logMsgType - DEBUG, TRACE, INFO, WARN, ERROR
 #  $2: the log message
+#  $3: print to stdout, if false msg appears in log only
 #
 # Returns
 #  nothing
@@ -433,9 +434,17 @@ log4bsh_exitHook(){
 #  1: if not enabled, e.g. DEBUG not active
 #
 captureOutputStreams() {
+
   if $REDIRECTION_ENABLED; then
     return 0;
-  elif ([ $# -gt 0 ] && $1) || $DEBUG; then
+  elif [ ! -e /proc/$$/fd/1 ] \
+      || [ ! -e /proc/$$/fd/2 ]; then
+    echo "Cannot capture outputstreams, no filedescriptors '1' and '2' available for process";
+    return 1;
+  fi
+
+  if $DEBUG \
+      || ([ $# -gt 0 ] && $1); then
     # store pipes, std in 3 and err in 4
     exec 3>&1 4>&2;
     # write to log-file and stderr/stdout
@@ -467,6 +476,7 @@ stopOutputCapturing() {
     # restore pipes
     exec >&3 2>&4;
     REDIRECTION_ENABLED=false;
+    PRINT_TO_STDOUT=true;
     return 0;
   fi
   return 1;
@@ -486,15 +496,25 @@ stopOutputCapturing() {
 #
 getCallerName() {
 
-  # try via parent PID
-  process="$(ps --no-headers -o command $PPID | tr -s ' ' | cut -d' ' -f1 | sed 's,:,,g')";
+  # try via PID
+  process="$(ps --no-headers -o command $$ | tr -s ' ' | cut -d' ' -f2 | sed 's,:,,g')";
+  if [ ! -n "$process" ]; then
+    # try via parent PID
+    process="$(ps --no-headers -o command $PPID | tr -s ' ' | cut -d' ' -f1 | sed 's,:,,g')";
+  fi
+
   if [[ "$process" =~ sshd$ ]]; then
     viaSSH=true;
   else
     viaSSH=false;
   fi
 
-  if [[ "$process" =~ [sshd|bash|notty]$ ]]; then
+  # remove leading '-' if exists
+  if [[ "$process" =~ ^-.+ ]]; then
+    process="${process:1}";
+  fi
+
+  if [[ "$process" =~ (sshd|bash|notty)$ ]]; then
     # via parent PID
     process="$(ps --no-headers -o command $PPID | tr -s ' ' | cut -d' ' -f2)";
     # try via own PID
@@ -508,8 +528,11 @@ getCallerName() {
     fi
   fi
 
-  process="$(basename $process)";
-  process="$(log4bsh_mapName $process)";
+  # check if process is not empty before issuing calls on it
+  if [ -n "$process" ]; then
+    process="$(basename $process)";
+    process="$(log4bsh_mapName $process)";
+  fi
 
   if $viaSSH; then
    process="sshd:$process";
@@ -842,4 +865,3 @@ showLog(){
   [ ! -f $LOG_FILE ] && touch $LOG_FILE;
   tail -n1 -f $LOG_FILE;
 }
-
