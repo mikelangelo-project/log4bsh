@@ -291,8 +291,8 @@ _log() {
     # ensure log is not bigger than MAX_LOG_SIZE
     file_size=$(du -b $LOG_FILE | tr -s '\t' ' ' | cut -d' ' -f1);
     if [ $file_size -ge $MAX_LOG_SIZE ]; then
-      mv $LOG_FILE $LOG_FILE.$(date +%Y-%m-%dT%H-%M-%S);
-      touch $LOG_FILE;
+      mv "$LOG_FILE" "$LOG_FILE.$(date +%Y-%m-%dT%H-%M-%S)";
+      touch "$LOG_FILE";
     fi
   fi
 
@@ -301,10 +301,10 @@ _log() {
   #
 
   # ensure log file dir exists
-  if [ ! -f $LOG_FILE ] \
-      && [ ! -d $(dirname $LOG_FILE) ] \
-      &&  ! (mkdir -p $(dirname $LOG_FILE) \
-        && touch $LOG_FILE); then
+  if [ ! -f "$LOG_FILE" ] \
+      && [ ! -d $(dirname "$LOG_FILE") ] \
+      &&  ! (mkdir -p $(dirname "$LOG_FILE") \
+        && touch "$LOG_FILE"); then
     echo "ERROR: Cannot write log to '$LOG_FILE' !";
     # print to STDOUT at least if not disabled
     if $printToSTDout; then
@@ -315,10 +315,10 @@ _log() {
     echo -e "$printMsg";
   elif $printToSTDout; then
     # print log msg on screen and in file (only if redirection is not enabled
-    echo -e "$printMsg" |& tee -a $LOG_FILE;
+    echo -e "$printMsg" |& tee -a "$LOG_FILE";
   else
     # print into log file, only
-    echo -e "$printMsg" &>> $LOG_FILE;
+    echo -e "$printMsg" &>> "$LOG_FILE";
   fi
 }
 
@@ -439,7 +439,12 @@ captureOutputStreams() {
     return 0;
   elif [ ! -e /proc/$$/fd/1 ] \
       || [ ! -e /proc/$$/fd/2 ]; then
-    echo "Cannot capture outputstreams, no filedescriptors '1' and '2' available for process";
+    msg="Cannot capture outputstreams, no filedescriptors '1' and '2' available for process '$$'.";
+    if [ -w "$LOG_FILE" ]; then
+      echo "$msg" >> "$LOG_FILE";
+    else
+      logger "$msg";
+    fi
     return 1;
   fi
 
@@ -448,8 +453,8 @@ captureOutputStreams() {
     # store pipes, std in 3 and err in 4
     exec 3>&1 4>&2;
     # write to log-file and stderr/stdout
-    exec 2>> >(tee -a $LOG_FILE);
-    exec 1>> >(tee -a $LOG_FILE);
+    exec 2>> >(tee -a "$LOG_FILE");
+    exec 1>> >(tee -a "$LOG_FILE");
     # remember it
     REDIRECTION_ENABLED=true;
     # indicate success
@@ -474,9 +479,8 @@ captureOutputStreams() {
 stopOutputCapturing() {
   if $REDIRECTION_ENABLED; then
     # restore pipes
-    exec >&3 2>&4;
+    exec 1>&3 2>&4;
     REDIRECTION_ENABLED=false;
-    PRINT_TO_STDOUT=true;
     return 0;
   fi
   return 1;
@@ -496,17 +500,19 @@ stopOutputCapturing() {
 #
 getCallerName() {
 
-  # try via PID
-  process="$(ps --no-headers -o command $$ | tr -s ' ' | cut -d' ' -f2 | sed 's,:,,g')";
-  if [ ! -n "$process" ]; then
-    # try via parent PID
-    process="$(ps --no-headers -o command $PPID | tr -s ' ' | cut -d' ' -f1 | sed 's,:,,g')";
-  fi
-
+  # running via SSH ?
+  process="$(ps --no-headers -o command $PPID | tr -s ' ' | cut -d' ' -f1 | sed 's,:,,g')";
   if [[ "$process" =~ sshd$ ]]; then
     viaSSH=true;
   else
     viaSSH=false;
+  fi
+
+  # try resolval via PID
+  process="$(ps --no-headers -o command $$ | tr -s ' ' | cut -d' ' -f2 | sed 's,:,,g')";
+  if [ ! -n "$process" ]; then
+    # try via parent PID
+    process="$(ps --no-headers -o command $PPID | tr -s ' ' | cut -d' ' -f1 | sed 's,:,,g')";
   fi
 
   # remove leading '-' if exists
@@ -612,9 +618,13 @@ logCmdLine() {
     logToSTDOUT=$PRINT_TO_STDOUT;
   fi
 
-  # fetch parent's full cmd line
-  cmdLine="$(ps --no-headers -o command $$)";
-  _log $logLevel "Cmd line: '$cmdLine'" $logToSTDOUT;
+  # ensure log level is respected
+    if ([ "$logLevel" != "DEBUG" ] || $DEBUG) \
+        && ([ "$logLevel" != "TRACE" ] || $TRACE); then
+    # fetch parent's full cmd line
+    cmdLine="$(ps --no-headers -o command $$)";
+    _log $logLevel "Cmd line: '$cmdLine'" $logToSTDOUT;
+  fi
 
   # renable if it was enabled before
   _setXFlag $cachedBashOpts;
@@ -823,17 +833,21 @@ runTimeStats() {
   logDebugMsg "Runtime statistic for '$0':\n---------------------\n\
    shell (user | system)\nchildren (user | system)\n----------------";
 
-  # print to stdout ?
-  if $PRINT_TO_STDOUT; then
-     # yes
-     $DEBUG && times |& tee -a $LOG_FILE;
-     $DEBUG && echo "" |& tee -a $LOG_FILE;
-   else
-     # no, print to file, only
-     times &>> $LOG_FILE;
-     echo "" >> $LOG_FILE;
-   fi
-
+  if $DEBUG; then
+    # print to stdout ?
+    if $PRINT_TO_STDOUT \
+         && [ -e /proc/$$/fd/1 ] \
+         && [ -e /proc/$$/fd/2 ]; then
+       # yes
+       times |& tee -a "$LOG_FILE";
+       echo "" |& tee -a "$LOG_FILE";
+     elif [ -f "$LOG_FILE" ]; then
+       # no, print to file, only
+       times &>> "$LOG_FILE";
+       # add a line break
+       echo "" >> "$LOG_FILE";
+     fi
+  fi
   # renable if it was enabled before
   _setXFlag $cachedBashOpts;
 }
