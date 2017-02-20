@@ -46,7 +46,7 @@ printLog() {
 
 #
 # When an error msg is printed, exit is called, but
-# before this happens we want to print the log on screen.
+# before this happens print the log on screen.
 #
 log4bsh_exitHook() {
   printLog;

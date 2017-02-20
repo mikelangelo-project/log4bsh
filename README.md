@@ -54,15 +54,18 @@ or a configuration file.
 
 | Config Parameter      | Description        | Default Value |
 | :---              | :---          |:---          |
+| `LOG4BSH_CONFIG_FILE`	| Optional configuration file, overrides all others. | `undefined` |
 | `LOG_FILE`     | Log file for messages. | `~/.log4bsh.log` |
+| `LOG_LEVEL`	| Defines current level for log msgs, allows also to log specific scripts at a certain level | `undefined` (== `ALL:INFO`) |
 | `LOG_ROTATE` | Flag indicating to use log rotate. | `TRUE` |
 | `MAX_LOG_SIZE` | Maximum size for log files in bytes. | `5242880` (= 5MB) |
 | `ABORT_ON_ERROR ` | Flag indicating the default behaviour for error messages |  `TRUE ` |
 | `PRINT_TO_STDOUT` | Flag indicating to print messages to log and `STDOUT` | `FALSE` |
 | `DATE_FORMAT` | Date format for log messages. | `+%Y-%m-%dT%H:%M:%S` |
 | `USE_COLORS` | Use colors for log messages | `TRUE` |
-| `DEBUG` | Flag indicating to print debug messages. | `FALSE` |
-| `TRACE` | Flag indicating to print trace messages, if enabled, `DEBUG` is also enabled. | `FALSE` |
+| `COLORS`	| Allows to override default colors for log levels. Associative array, with keys: TRACE,DEBUG,INFO,WARN,ERROR | `TRACE->lblue`, `DEBUG->blue`, `INFO->green`, `WARN->orange`, `ERROR->red` |
+| `DEBUG` | Indicates to print msg at level 'DEBUG'. Ignored if LOG_LEVEL is set. | `FALSE` |
+| `TRACE` | Indicates to print msg at level 'TRACE'. Ignored if LOG_LEVEL is set. | `FALSE` |
 
 
 
@@ -78,7 +81,8 @@ For a system wide configuration, use file
 
 For an user specific configuration, that overrides a system wide configuration,
 use file
-* `$HOME/.log4bash.conf`
+* `$HOME/log4bash.conf`
+* If not found, it is search for file `$HOME/.log4bash.conf`
 
 You may consider already set environment variables, and apply them only in
 in case they are not set. For example:
@@ -97,25 +101,25 @@ Using Environment Variables for Configuration
 All configuration options can be applied via the environment, too.
 This allows you, for example, to enable `DEBUG` or `TRACE` for certain code
 section and disable it afterwards again. Or to log the output of specific
-sub-scripts into their own log file by providing a separate LOG_FILE definition
-for each one.
+sub-scripts into their own log file by providing a dedicated LOG_FILE
+setting for each one.
 
 ```bash
 #!/bin/bash
 #
 # this file is called by another script that has linked the log4bsh.sh file.
-# but we want to write to a separate log file, thus we define for this script
+# To write to a separate log file, define it separately in this script
 # some options different from the parent script's configuration.
 LOG_FILE="/tmp/myScript_XYZ.log";
 
 # ..some code..
 
-# now we increase the log level to TRACE
+# now increase the log level to TRACE
 TRACE=true;
 
 # ..some more code where you want to print trace messages..
 
-# now we disable trace output again
+# now disable trace output again
 TRACE=false;
 
 # ..more code..
@@ -123,6 +127,16 @@ TRACE=false;
 exit 0;
 ```
 
+However there is no need to touch your scripts. If you want to modify the log
+level for a specific script, you can do so from the outside.  
+Example:
+```bash
+#!/bin/bash
+
+# set overall logging level to WARN, but for myScript.sh set it to TRACE
+export  LOG_LEVEL="ALL:WARN,myScript.sh:TRACE";
+./myScriptThatUsesLog4bsh.sh
+```
 
 
 Logging Functions
@@ -262,6 +276,14 @@ without any logic so far. They are intended to be overridden if needed.
   *  Parameter:
     * `$1`: Name of a script or process.
   *  Returns: Nothing per default, however the (mapped/non-mapped) name is
+              printed via echo to `STDOUT`.
+
+* **`log4bsh_getLogFileName`**
+  *  Description:  Allows you have dedicated log files for your scripts,
+                   dependent on the actual script's name.
+  *  Parameter:
+    * `$1`: Name of a script or process.
+  *  Returns: Nothing per default, however the log file name is
               printed via echo to `STDOUT`.
 
 * **`log4bsh_exitHook`**

@@ -21,47 +21,92 @@
 #        USAGE: source log4bsh.sh
 #
 #  DESCRIPTION: Easy to use logging library for bash.
-#               It allows you to either go straight on and use the
-#               configuration defaults or override some options as required.
+#               It allows to either go straight on and use the configuration
+#               defaults or override some options as required.
 #               Log msg format:
 #                [host|date|processName|logLevel] logMsg
 #
-#      OPTIONS:
+#  ENV VARIABLES:
+#
 #               LOG4BSH_CONFIG_FILE
-#                Optional configuration file
+#                Optional configuration file, overrides all other configs.
+#                Default: empty
+#
+#               LOG_FILE
+#                Standard log file to be used, if there is no dedicated one
+#                for a specific script.
+#                Default: ~/log4bsh.log
+#
+#               LOG_LEVEL
+#                Defines current level for log msgs, allows to log also
+#                specific scripts at a certain level.
+#                dedicated level can be set.
+#                Default: empty (== ALL at level 'INFO')
+#
+#               LOG_ROTATE
+#                Whether to use log rotation to keep log size limimted.
+#                Default: true
+#
+#               MAX_LOG_SIZE
+#                Maximum log file size in KB. Ignored if LOG_ROTATE is 'false'.
+#                Default: 5242880 (== 5MB)
+#
 #               PRINT_TO_STDOUT
-#                Indicates whether to print to STDOUT
+#                Indicates whether to print to STDOUT in addition.
+#                Default: false
+#
+#               ABORT_ON_ERROR
+#                Indicates whether to exit in case of an error msg.
+#                Default: false
+#
 #               DATE_FORMAT
-#                Default is "+%H:%M:%S"
+#                Dateformat for logging msgs.
+#                Default: "+%Y-%m-%dT%H:%M:%S"
+#
 #               USE_COLORS
-#                Indicates to use colors for msgs, default is 'true'
+#                Indicates to use colors for msgs.
+#                Default: true
+#
+#               COLORS
+#                Allows to override default colors for log levels.
+#                Associative array, with keys: TRACE,DEBUG,INFO,WARN,ERROR
+#                Defaults: TRACE->lblue, DEBUG->blue, INFO->green, WARN->orange, ERROR->red
+#
 #               DEBUG
-#                Indicates to print msg at debug level
+#                Indicates to print msg at debug level.
+#                Ignored if LOG_LEVEL is set.
+#                Default: false
+#
 #               TRACE
 #                Indicates to print msg at trace level
+#                Ignored if LOG_LEVEL is set.
+#                Default: false
 #
-# REQUIREMENTS: bash version 4.0 or later
+#
+#
+# REQUIREMENTS: bash version 4.0 or later (associative arrays are used)
 #
 #         BUGS: ---
 #
 #        NOTES: 1) Messages logged at level 'INFO','WARN','ERROR' will always
-#                  be printed.
+#                  be printed, except 'LOG_LEVEL' is set.
 #               2) When a configuration file is found, it may override
-#                  environment variables you have set in addition. Depends on
-#                  your configuration file's logic, i.e. you can control to
-#                  skip the initialization if an (environment) variable exists.
-#               3) If bash option x is present, e.g. by calling 'set -x', the
-#                  flag will be removed during the logging and restored after.
-#                  Otherwise your debugging output would be largely expanded
-#                  by the logging's internal calls.
+#                  environment variables that have been set by a file loaded
+#                  previously. It actually depends on the configuration
+#                  file's logic, i.e. it can skip options if already set.
+#               3) If bash option 'x' is present, e.g. by calling 'set -x',
+#                  the flag will be removed during the logging and restored
+#                  after. Otherwise the debugging output would be largely
+#                  expanded by log4bsh's internal calls.
 #
 #       AUTHOR: Nico Struckmann, struckmann@hlrs.de
 #      COMPANY: HLRS, University of Stuttgart
-#      VERSION: 0.1
+#      VERSION: 0.2
 #      CREATED: Sept 30th, 2016
-#     REVISION: ..
+#     REVISION: ...
 #
 #    CHANGELOG
+#     2017-02-22  v0.2  N.Struckmann    some bug fixes, config enhanced
 #
 #=============================================================================
 set -o nounset;
@@ -72,42 +117,93 @@ LOG4BSH_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)";
 
 #----------------------------------------------------------------------------#
 #                                                                            #
-#                                CONFIG                                      #
-#           (can be overriden via config file or environment vars)           #
+#                              LOAD CONFIG FILE                              #
 #                                                                            #
 #----------------------------------------------------------------------------#
 
 #
 # Check if there are any configuration files.
-# They are loaded one by one to enable you having a global base configuration
-# that can be overridden by a user defined one in his home. And for development
-# and debugging purposes you can define a temporary file via the environment.
 #
-# order of configuration files being loaded:
-#  1) at first check in the logger lib's dir
-#  2) check if there is one in home, named '.log4bash.conf'
-#  3) at last check the environment variable 'LOG4BSH_CONFIG_FILE'
+# Files found are loaded one by one to enable a global base configuration for
+# all users on a system.
+# The system-wide config can be overridden and customized by users.
 #
-if [ -f "/etc/log4bash.conf" ]; then
-  # yes, source it
-  source "$LOG4BSH_ABSOLUTE_PATH/log4bash.conf";
-elif [ -f "$LOG4BSH_ABSOLUTE_PATH/log4bash.conf" ]; then
-  # yes, source it
+# Order of configuration files being loaded and overriding the previous one's
+# settings:
+#
+#  1) Read from log4bsh's dir, config file 'log4bsh.conf'.
+#  2) Read file '/etc/log4bsh.conf'.
+#  3) Read from users $HOME, file 'log4bash.conf',
+#      if not found try hidden file '.log4bash.conf'.
+#  4) As last check the environment variable 'LOG4BSH_CONFIG_FILE',
+#      and load it if it points to a file.
+#
+
+
+#
+#  1) Read from log4bsh's dir, config file 'log4bsh.conf'.
+#
+if [ -f "$LOG4BSH_ABSOLUTE_PATH/log4bash.conf" ]; then
   source "$LOG4BSH_ABSOLUTE_PATH/log4bash.conf";
 fi
 
-# config present in home (that will override the global one) ?
-if [ -f ~/.log4bash.conf ]; then
-  # yes, source it
+#
+#  2) Read file '/etc/log4bsh.conf'.
+#
+if [ -f "/etc/log4bash.conf" ]; then
+  source "$LOG4BSH_ABSOLUTE_PATH/log4bash.conf";
+fi
+
+#
+#  3) Read from users $HOME, file 'log4bash.conf',
+#      if not found try hidden file '.log4bash.conf'.
+#
+if [ -f ~/log4bash.conf ]; then
+  source ~/log4bash.conf;
+elif [ -f ~/.log4bash.conf ]; then
   source ~/.log4bash.conf;
 fi
 
-# is there a config file defined in the environment (overrides previous ones) ?
+#
+#  4) As last check the environment variable 'LOG4BSH_CONFIG_FILE',
+#      and load it if it points to a file.
+#
 if [ -n "${LOG4BSH_CONFIG_FILE-}" ] \
     && [ -f "$LOG4BSH_CONFIG_FILE" ]; then
-  # yes, source it
   source "$LOG4BSH_CONFIG_FILE";
 fi
+
+
+#----------------------------------------------------------------------------#
+#                                                                            #
+#                               CONSTANTS                                    #
+#                      (do not touch or override!)                           #
+#                                                                            #
+#----------------------------------------------------------------------------#
+
+#
+# Constant for local host's name.
+#
+LOCALHOST="$(hostname -s)";
+
+#
+# Colors used for log messages.
+#
+LOG4BSH_RED='\033[0;31m';
+LOG4BSH_ORANGE='\033[0;33m';
+LOG4BSH_GREEN='\033[0;32m';
+LOG4BSH_BLUE='\033[0;34m';
+LOG4BSH_LBLUE='\033[1;34m';
+LOG4BSH_NC='\033[0m'; # No Color
+
+
+#----------------------------------------------------------------------------#
+#                                                                            #
+#                               DEFAULTS                                     #
+#                                                                            #
+#        (following values are applied, if there is no setting defined)      #
+#                                                                            #
+#----------------------------------------------------------------------------#
 
 #
 # Log file defined ?
@@ -187,44 +283,33 @@ elif $TRACE; then
   DEBUG=true;
 fi
 
-
-#----------------------------------------------------------------------------#
-#                                                                            #
-#                               CONSTANTS                                    #
-#   (do not touch or override, except you exactly know what you're doing!)   #
-#                                                                            #
-#----------------------------------------------------------------------------#
-
-#
-# Constant for local host's name.
-#
-LOCALHOST="$(hostname -s)";
-
-#
-# Colors used for log messages.
-#
-RED='\033[0;31m';
-ORANGE='\033[0;33m';
-GREEN='\033[0;32m';
-BLUE='\033[0;34m';
-LBLUE='\033[1;34m';
-NC='\033[0m'; # No Color
-
 #
 # Mapping of log levels to colors.
 #
-declare -A COLORS;
-COLORS["TRACE"]=$LBLUE;
-COLORS["DEBUG"]=$BLUE;
-COLORS["INFO"]=$GREEN;
-COLORS["WARN"]=$ORANGE;
-COLORS["ERROR"]=$RED;
+if [ -z "${LOG4BSH_COLORS-}" ]; then
+  declare -A LOG4BSH_COLORS;
+fi
+if [ -z "${LOG4BSH_COLORS['TRACE']-}" ]; then
+  LOG4BSH_COLORS["TRACE"]=$LOG4BSH_LBLUE;
+fi
+if [ -z "${LOG4BSH_COLORS['DEBUG']-}" ]; then
+  LOG4BSH_COLORS["DEBUG"]=$LOG4BSH_BLUE;
+fi
+if [ -z "${LOG4BSH_COLORS['INFO']-}" ]; then
+  LOG4BSH_COLORS["INFO"]=$LOG4BSH_GREEN;
+fi
+if [ -z "${LOG4BSH_COLORS['WARN']-}" ]; then
+  LOG4BSH_COLORS["WARN"]=$LOG4BSH_ORANGE;
+fi
+if [ -z "${LOG4BSH_COLORS['ERROR']-}" ]; then
+  LOG4BSH_COLORS["ERROR"]=$LOG4BSH_RED;
+fi
 
 
 #----------------------------------------------------------------------------#
 #                                                                            #
 #                            INTERNAL VARIABLES                              #
-#                             (do not touch!)                                #
+#                        (do not touch or override!)                         #
 #                                                                            #
 #----------------------------------------------------------------------------#
 
@@ -235,11 +320,10 @@ COLORS["ERROR"]=$RED;
 REDIRECTION_ENABLED=false;
 
 
-
 #----------------------------------------------------------------------------#
 #                                                                            #
 #                            INTERNAL FUNCTIONS                              #
-#                (not intended to be used outside this script)               #
+#                         (do not use, may change)                           #
 #                                                                            #
 #----------------------------------------------------------------------------#
 
@@ -249,9 +333,12 @@ REDIRECTION_ENABLED=false;
 # Central internal logging function.
 #
 # Parameter
-#  $1: logMsgType - DEBUG, TRACE, INFO, WARN, ERROR
-#  $2: the log message
-#  $3: print to stdout, if false msg appears in log only
+#  $1: message's log level, one of
+#       'DEBUG','TRACE','INFO','WARN','ERROR'
+#  $2: message to log
+#  $3: optional, print to stdout,
+#       if false, msg appears in log, only
+#       if not set 'PRINT_TO_STDOUT' will be used instead
 #
 # Returns
 #  nothing
@@ -264,15 +351,57 @@ _log() {
 \nProvided params are: '$@'" 2;
   fi
 
-  logLevel=$1;
-  color=${COLORS[$logLevel]};
-  logMsg=$2;
-  printToSTDout=$3;
+  local logLevel=$1;
+  local logMsg=$2;
+
+  # optional argument provided ?
+  local printToSTDout;
+  if [ $# -gt 2 ]; then
+    printToSTDOUT=$3;
+  else
+    printToSTDOUT=$PRINT_TO_STDOUT;
+  fi
 
   # get caller's name (script file name or parent process if remote)
   processName="$(getCallerName)";
 
-  # for shorter log level names, we prepend the log message with a space to
+  #
+  # determine if msg should be logged at current level
+  #
+  logTheMsg=false;
+  if [ -z "${LOG_LEVEL-}" ]; then
+    # no filter defined check TRACE/DEBUG
+    if $TRACE \
+        || ($DEBUG && [ "$logLevel" != "TRACE" ]) \
+        || [[ "$logLevel" =~ ^(INFO|WARN|ERROR)$ ]]; then
+      logTheMsg=true;
+    fi
+  elif [[ "$LOG_LEVEL" =~ $processName:?.*,? ]]; then
+    # check if log level is below threshold
+    if [[ "$LOG_LEVEL" =~ "$processName:$logLevel" ]]; then
+      logTheMsg=true;
+    elif [[ "$LOG_LEVEL" =~ "$processName:TRACE" ]]\
+        && [[ $logLevel =~ ^(TRACE|DEBUG|INFO|WARN|ERROR)$ ]]; then
+      logTheMsg=true;
+    elif [[ "$LOG_LEVEL" =~ "$processName:DEBUG" ]]\
+        && [[ $logLevel =~ ^(DEBUG|INFO|WARN|ERROR)$ ]]; then
+      logTheMsg=true;
+    elif [[ "$LOG_LEVEL" =~ "$processName:INFO" ]]\
+        && [[ $logLevel =~ ^(INFO|WARN|ERROR)$ ]]; then
+      logTheMsg=true;
+    elif [[ "$LOG_LEVEL" =~ "$processName:WARN" ]]\
+        && [[ $logLevel =~ ^(WARN|ERROR)$ ]]; then
+      logTheMsg=true;
+    fi
+  elif [[ "$LOG_LEVEL" =~ (ALL:?)?($logLevel|ALL) ]]; then
+    logTheMsg=true;
+  fi
+
+  # abort here ?
+  $logTheMsg \
+    || return 0;
+
+  # for shorter log level names, prepend the log message with a space to
   # have all messages starting at the same point, more convenient to read
   if [[ $logLevel =~ ^(WARN|INFO)$ ]]; then
     logMsg=" $logMsg";
@@ -280,19 +409,26 @@ _log() {
 
   # construct log message
   if $USE_COLORS; then
-    printMsg="$color[$LOCALHOST|$(date $DATE_FORMAT)|$processName|$logLevel]$NC $logMsg";
+    printMsg="${LOG4BSH_COLORS[$logLevel]}[$LOCALHOST|$(date $DATE_FORMAT)|$processName|$logLevel]$LOG4BSH_NC $logMsg";
   else
     printMsg="[$LOCALHOST|$(date $DATE_FORMAT)|$processName|$logLevel] $logMsg";
   fi
 
-  # log rotate enabled
+  #
+  # get log file name
+  #
+  local logFile="$(log4bsh_getLogFileName)";
+
+  #
+  # log rotate, if enabled
+  #
   if $LOG_ROTATE \
-        && [ -e $LOG_FILE ]; then
+        && [ -e "$logFile" ]; then
     # ensure log is not bigger than MAX_LOG_SIZE
-    file_size=$(du -b $LOG_FILE | tr -s '\t' ' ' | cut -d' ' -f1);
+    file_size=$(du -b "logFile" | tr -s '\t' ' ' | cut -d' ' -f1);
     if [ $file_size -ge $MAX_LOG_SIZE ]; then
-      mv "$LOG_FILE" "$LOG_FILE.$(date +%Y-%m-%dT%H-%M-%S)";
-      touch "$LOG_FILE";
+      mv "$logFile" "$logFile.$(date +%Y-%m-%dT%H-%M-%S)";
+      touch "$logFile";
     fi
   fi
 
@@ -301,24 +437,24 @@ _log() {
   #
 
   # ensure log file dir exists
-  if [ ! -f "$LOG_FILE" ] \
-      && [ ! -d $(dirname "$LOG_FILE") ] \
-      &&  ! (mkdir -p $(dirname "$LOG_FILE") \
-        && touch "$LOG_FILE"); then
-    echo "ERROR: Cannot write log to '$LOG_FILE' !";
+  if [ ! -f "$logFile" ] \
+      && [ ! -d $(dirname "$logFile") ] \
+      &&  ! (mkdir -p $(dirname "$logFile") \
+        && touch "$logFile"); then
+    echo "ERROR: Cannot write log to '$logFile' !";
     # print to STDOUT at least if not disabled
     if $printToSTDout; then
         echo -e "$printMsg";
     fi
   elif $REDIRECTION_ENABLED; then
-    # when redirection is enabled, we print to STDOUT only (otherwise msg appears twice in the log)
+    # when redirection is enabled, print to STDOUT only (otherwise msg appears twice in the log)
     echo -e "$printMsg";
   elif $printToSTDout; then
     # print log msg on screen and in file (only if redirection is not enabled
-    echo -e "$printMsg" |& tee -a "$LOG_FILE";
+    echo -e "$printMsg" |& tee -a "$logFile";
   else
     # print into log file, only
-    echo -e "$printMsg" &>> "$LOG_FILE";
+    echo -e "$printMsg" &>> "$logFile";
   fi
 }
 
@@ -334,7 +470,6 @@ _log() {
 #  nothing
 #
 _unsetXFlag() {
-  #return 0;
   # is '-x' set ? if yes disable it
   [[ "$1" =~ x ]] && set +x;
 }
@@ -351,33 +486,30 @@ _unsetXFlag() {
 #  nothing
 #
 _setXFlag() {
-  #return 0;
   # was '-x' set ? if yes disable it
   [[ "$1" =~ x ]] && set -x;
 }
 
 
-
 #----------------------------------------------------------------------------#
 #                                                                            #
-#                           FUNCTIONS TO OVERRIDE                            #
-#                                (as needed)                                 #
+#                         OPTIONAL FUNCTION HOOKS                            #
+#                   (override in cutom config on demand)                     #
 #                                                                            #
 #----------------------------------------------------------------------------#
 
 
 #---------------------------------------------------------
 #
-# This function is intended to be overridden on demand.
-# Allows you to map file names to certain entity names.
-# For example, if you want to hide file extensions in the output, or use short
-# names for your (sub-)scripts in the logging output.
+# Override to map of file names to custom entity names,
+# to remove file suffixes or use short names instead, and
+# similar tasks.
 #
 # Parameter
-#  $1: a script or process name
+#  $1: Script or process name that called one of the logging functions
 #
 # Returns
-#  nothing, but echo (mapped) script name to STDOUT
+#  nothing, but echos (mapped) script name to STDOUT
 #
 log4bsh_mapName() {
   echo $1;
@@ -386,44 +518,48 @@ log4bsh_mapName() {
 
 #---------------------------------------------------------
 #
-# This function is intended to be overridden on demand.
+# Override to have multiple logfiles, dependent on the
+# actual script's or process' name.
 #
 # Parameter
-#  $1: a script or process name
+#  $1: Script or process name that called one of the logging functions
 #
 # Returns
-#  nothing, but echo (mapped) script name to STDOUT
+#  nothing, but echos (mapped) script name to STDOUT
+#
+log4bsh_getLogFileName() {
+  echo $LOG_FILE;
+}
+
+
+#---------------------------------------------------------
+#
+# Override to run custom logic in case of exit, caused by
+# calling function 'logErrorMsg'.
+#
+# Parameter
+#  none
+#
+# Returns
+#  nothing
 #
 log4bsh_exitHook(){
   echo "";
 }
 
 
-
 #----------------------------------------------------------------------------#
 #                                                                            #
-#                          API / PUBLIC FUNCTIONS                            #
+#                              API FUNCTIONS                                 #
 #                                                                            #
 #----------------------------------------------------------------------------#
-
 
 #---------------------------------------------------------
 #
-# Function to enable capturing of all output to STDOUT/ERR,
-# if $DEBUG or $TRACE is 'true'.
-#
-# Ensures that output from 'set -x' for example is written to the log, too.
-# While a job does not complete (getting re-queued for ex) we have no log
-# and without this redirect our logfile would not contain it either
-#
-# quote:
-# "Also, standard input for both scripts is connected to a system dependent file.
-# Currently, for all systems this is /dev/null.
-# Except for epilogue scripts of an interactive job, prologue.parallel,
-# epilogue.precancel, and epilogue.parallel, the standard output and error are
-# connected to output and error files associated with the job
-# For prologue.parallel and epilogue.parallel, the user will need to redirect
-# stdout and stderr manually."
+# Enables capturing of STDOUT and STDERR streams, if
+# 'DEBUG' or 'TRACE' is set to 'true'.
+# I.e. useful for 'set -x' output in scripts running in the
+# background.
 #
 # Parameter
 #  $1: Optional, flag to indicate to force the redirection, even if DEBUG is
@@ -437,15 +573,23 @@ captureOutputStreams() {
 
   if $REDIRECTION_ENABLED; then
     return 0;
-  elif [ ! -e /proc/$$/fd/1 ] \
-      || [ ! -e /proc/$$/fd/2 ]; then
+  fi
+
+  # get log file name
+  local logFile="$(log4bsh_getLogFileName)";
+
+  # filedescriptors for STDOUT and STDERR both exist ?
+  if [ ! -e /proc/$$/fd/1 ] \
+      || [ ! -e /proc/$$/fd/2 ]; then #no
     msg="Cannot capture outputstreams, no filedescriptors '1' and '2' available for process '$$'.";
-    if [ -w "$LOG_FILE" ]; then
-      echo "$msg" >> "$LOG_FILE";
-    else
+    # write to log file if possible
+    if [ -f "$logFile" ] \
+        || $(touch "$logFile"); then
+      echo "$msg" >> "$logFile";
+    else # write to syslog instead
       logger "$msg";
+      return 1;
     fi
-    return 1;
   fi
 
   if $DEBUG \
@@ -453,13 +597,14 @@ captureOutputStreams() {
     # store pipes, std in 3 and err in 4
     exec 3>&1 4>&2;
     # write to log-file and stderr/stdout
-    exec 2>> >(tee -a "$LOG_FILE");
-    exec 1>> >(tee -a "$LOG_FILE");
+    exec 2>> >(tee -a "$logFile");
+    exec 1>> >(tee -a "$logFile");
     # remember it
     REDIRECTION_ENABLED=true;
     # indicate success
     return 0;
   fi
+
   # indicate failure
   return 1;
 }
@@ -489,8 +634,8 @@ stopOutputCapturing() {
 
 #---------------------------------------------------------
 #
-# Internal function to get the name of script/parent process that called your
-# script.
+# Internal function to get the name of script/parent
+# process that called a script.
 #
 # Parameter
 #  none
@@ -501,12 +646,8 @@ stopOutputCapturing() {
 getCallerName() {
 
   # running via SSH ?
-  process="$(ps --no-headers -o command $PPID | tr -s ' ' | cut -d' ' -f1 | sed 's,:,,g')";
-  if [[ "$process" =~ sshd$ ]]; then
-    viaSSH=true;
-  else
-    viaSSH=false;
-  fi
+  local process="$(ps --no-headers -o command $PPID | tr -s ' ' | cut -d' ' -f1 | sed 's,:,,g')";
+  local viaSSH=$([[ "$process" =~ sshd$ ]]);
 
   # try resolval via PID
   process="$(ps --no-headers -o command $$ | tr -s ' ' | cut -d' ' -f2 | sed 's,:,,g')";
@@ -549,7 +690,7 @@ getCallerName() {
 
 #---------------------------------------------------------
 #
-# Prints the name of the parent process that calls your
+# Prints the name of the parent process that calls a
 # script.
 #
 # Parameter
@@ -561,19 +702,21 @@ getCallerName() {
 #
 logCaller() {
 
-  # in case '-x' is set, we unset it, and remember
+  # in case '-x' is set, unset it and remember
   local cachedBashOpts="$-";
   _unsetXFlag $cachedBashOpts;
 
-  # optional argument provided ?
-   if [ $# -eq 1 ]; then
+  # optional loglevel argument provided ?
+  local logLevel;
+  if [ $# -eq 1 ]; then
     logLevel=$1;
   else
     logLevel="DEBUG";
   fi
 
   # optional argument provided ?
-   if [ $# -eq 2 ]; then
+  local logToSTDOUT;
+  if [ $# -eq 2 ]; then
     logToSTDOUT=$1;
   else
     logToSTDOUT=$PRINT_TO_STDOUT;
@@ -600,31 +743,29 @@ logCaller() {
 #
 logCmdLine() {
 
-  # in case '-x' is set, we unset it, and remember
+  # in case '-x' is set, unset it and remember
   local cachedBashOpts="$-";
   _unsetXFlag $cachedBashOpts;
 
   # optional argument provided ?
-   if [ $# -eq 1 ]; then
+  local logLevel;
+  if [ $# -gt 0 ]; then
     logLevel=$1;
   else
     logLevel="DEBUG";
   fi
 
   # optional argument provided ?
-   if [ $# -eq 2 ]; then
-    logToSTDOUT=$1;
+  local logToSTDOUT;
+  if [ $# -gt 1 ]; then
+    logToSTDOUT=$2;
   else
     logToSTDOUT=$PRINT_TO_STDOUT;
   fi
 
-  # ensure log level is respected
-    if ([ "$logLevel" != "DEBUG" ] || $DEBUG) \
-        && ([ "$logLevel" != "TRACE" ] || $TRACE); then
-    # fetch parent's full cmd line
-    cmdLine="$(ps --no-headers -o command $$)";
-    _log $logLevel "Cmd line: '$cmdLine'" $logToSTDOUT;
-  fi
+  # fetch parent's full cmd line
+  cmdLine="$(ps --no-headers -o command $$)";
+  _log $logLevel "Cmd line: '$cmdLine'" $logToSTDOUT;
 
   # renable if it was enabled before
   _setXFlag $cachedBashOpts;
@@ -633,8 +774,7 @@ logCmdLine() {
 
 #---------------------------------------------------------
 #
-# Prints the message in case the environment variable
-# TRACE is 'true', only.
+# Logs a trace message.
 #
 # Parameter
 #  $1: The message to log.
@@ -645,21 +785,12 @@ logCmdLine() {
 #
 logTraceMsg() {
 
-  # in case '-x' is set, we unset it, and remember
+  # in case '-x' is set, unset it and remember
   local cachedBashOpts="$-";
   _unsetXFlag $cachedBashOpts;
 
-  # optional argument provided ?
-  if [ $# -eq 2 ]; then
-    logToSTDOUT=$2;
-  else
-    logToSTDOUT=$PRINT_TO_STDOUT;
-  fi
-
-  # print in case, only if TRACE is 'true'
-  if $TRACE; then
-    _log "TRACE" "$1" $logToSTDOUT;
-  fi
+  # log msg
+  _log "TRACE" $@;
 
   # renable if it was enabled before
   _setXFlag $cachedBashOpts;
@@ -668,7 +799,7 @@ logTraceMsg() {
 
 #---------------------------------------------------------
 #
-# Logs a debug message, if 'DEBUG' is 'true'.
+# Logs a debug message.
 #
 # Parameter
 #  $1: The message to log.
@@ -679,21 +810,12 @@ logTraceMsg() {
 #
 logDebugMsg() {
 
-  # in case '-x' is set, we unset it, and remember
+  # in case '-x' is set, unset it and remember
   local cachedBashOpts="$-";
   _unsetXFlag $cachedBashOpts;
 
-  # optional argument provided ?
-  if [ $# -eq 2 ]; then
-    logToSTDOUT=$2;
-  else
-    logToSTDOUT=$PRINT_TO_STDOUT;
-  fi
-
-  # print in both cases, only: DEBUG and/or TRACE is 'true'
-  if $DEBUG || $TRACE; then
-    _log "DEBUG" "$1" $logToSTDOUT;
-  fi
+  # log msg
+  _log "DEBUG" $@;
 
   # renable if it was enabled before
   _setXFlag $cachedBashOpts;
@@ -702,7 +824,7 @@ logDebugMsg() {
 
 #---------------------------------------------------------
 #
-# Logs an info message, regardless of DEBUG flag.
+# Logs an info message.
 #
 # Parameter
 #  $1: The message to log.
@@ -713,19 +835,12 @@ logDebugMsg() {
 #
 logInfoMsg() {
 
-  # in case '-x' is set, we unset it, and remember
+  # in case '-x' is set, unset it and remember
   local cachedBashOpts="$-";
   _unsetXFlag $cachedBashOpts;
 
-  # optional argument provided ?
-  if [ $# -eq 2 ]; then
-    logToSTDOUT=$2;
-  else
-    logToSTDOUT=$PRINT_TO_STDOUT;
-  fi
-
   # print log msg
-  _log "INFO" "$1" $logToSTDOUT;
+  _log "INFO" $@;
 
   # renable if it was enabled before
   _setXFlag $cachedBashOpts;
@@ -745,19 +860,12 @@ logInfoMsg() {
 #
 logWarnMsg() {
 
-  # in case '-x' is set, we unset it, and remember
+  # in case '-x' is set, unset it and remember
   local cachedBashOpts="$-";
   _unsetXFlag $cachedBashOpts;
 
-  # optional argument provided ?
-  if [ $# -eq 2 ]; then
-    logToSTDOUT=$2;
-  else
-    logToSTDOUT=$PRINT_TO_STDOUT;
-  fi
-
   # print log message
-  _log "WARN" "$1" $logToSTDOUT;
+  _log "WARN" $@;
 
   # renable if it was enabled before
   _setXFlag $cachedBashOpts;
@@ -766,11 +874,12 @@ logWarnMsg() {
 
 #---------------------------------------------------------
 #
-# Logs an error message and exits.
+# Logs an error message and exits, expect ABORT_ON_ERROR
+# is set to false and provided error code arg is not '0'.
 #
 # Parameter
 #  $1: The message to log.
-#  $2: Optional error code, 0 means do not exit
+#  $2: Optional error code, 0 means do not exit regardless of `ABORT_ON_ERROR`
 #  $3: Optional boolean indicating to print to `STDOUT`.
 #
 # Returns
@@ -778,28 +887,29 @@ logWarnMsg() {
 #
 logErrorMsg() {
 
-  # in case '-x' is set, we unset it, and remember
+  # in case '-x' is set, unset it and remember
   local cachedBashOpts="$-";
   _unsetXFlag $cachedBashOpts;
 
   # optional argument provided ?
-  if [ $# -gt 2 ]; then
+  if [ $# -gt 1 ]; then
     exitCode=$2;
   else
     exitCode=1;
   fi
 
   # optional argument provided ?
-  if [ $# -eq 3 ]; then
-    logToSTDOUT=$3;
+  if [ $# -gt 2 ]; then
+    printToSTDOUT=$3;
   else
-    logToSTDOUT=$PRINT_TO_STDOUT;
+    printToSTDOUT=$PRINT_TO_STDOUT;
   fi
 
   # print log msg
-  _log "ERROR" "$1" $logToSTDOUT;
+  _log "ERROR" "$1" $printToSTDOUT;
 
-  if $ABORT_ON_ERROR || [ $exitCode -ne 0 ]; then
+  if $ABORT_ON_ERROR \
+      || [ $exitCode -ne 0 ]; then
 
     # call the pre-exit hook
     log4bsh_exitHook;
@@ -812,28 +922,71 @@ logErrorMsg() {
   fi
 }
 
+#---------------------------------------------------------
+#
+# Logs a trace message.
+#
+# Parameter
+#  $1: Log level, one of: 'TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR'
+#  $2: The message to log.
+#  $3: Optional boolean indicating to print to `STDOUT`.
+#
+# Returns
+#  nothing
+#
+logMsg() {
+
+  # in case '-x' is set, unset it and remember
+  local cachedBashOpts="$-";
+  _unsetXFlag $cachedBashOpts;
+
+  # log msg at log level provided
+  _log $@;
+
+  # renable if it was enabled before
+  _setXFlag $cachedBashOpts;
+}
+
 
 #---------------------------------------------------------
 #
-# Prints runtime statistics for your script.
+# Prints simple runtime statistics for a script by the
+# help of cmd 'times', as debug msg per default.
 #
 # Parameter
-#  none
+#  $1: log level, causes to print stats regardless of 'DEBUG'
 #
 # Returns
 #  nothing
 #
 runTimeStats() {
 
-  # in case '-x' is set, we unset it, and remember
+  # in case '-x' is set, unset it and remember
   local cachedBashOpts="$-";
   _unsetXFlag $cachedBashOpts;
 
+  # log level given ?
+  local ignoreDebugFlag;
+  if [ $# -gt 0 ] \
+      && [[ $1 =~ ^(TRACE|DEBUG|INFO|WARN|ERROR)$ ]]; then
+    level=$1;
+    ignoreDebugFlag=true;
+  else
+    level="DEBUG";
+    ignoreDebugFlag=false;
+  fi
+
   # print log msg
-  logDebugMsg "Runtime statistic for '$0':\n---------------------\n\
+  logMsg $level "Runtime statistic for '$0':\n---------------------\n\
    shell (user | system)\nchildren (user | system)\n----------------";
 
-  if $DEBUG; then
+  # get log file name
+  local logFile="$(log4bsh_getLogFileName)";
+
+  # print runtime stats ?
+  if $ignoreDebugFlag \
+      || $DEBUG; then
+
     # print to stdout ?
     if $PRINT_TO_STDOUT \
          && [ -e /proc/$$/fd/1 ] \
@@ -848,6 +1001,7 @@ runTimeStats() {
        echo "" >> "$LOG_FILE";
      fi
   fi
+
   # renable if it was enabled before
   _setXFlag $cachedBashOpts;
 }
@@ -863,19 +1017,34 @@ runTimeStats() {
 # In case the file doesn't exist, yet, or its parent directory does not exist,
 # it will be created beforehand.
 #
+# Useful i.e. in case where a script spawns to remote nodes and log is written
+# to a commonly shared file.
+#
 # NOTE:
-# This method blocks until 'Ctrl+C' is pressed or 'tail -f' is killed!
+# This method blocks until 'Ctrl+c' is pressed or 'tail -f' is killed.
 #
 # Parameter
-#  none
+#  $1: boolean indicating to print the hint for 'Ctrl+c'
 #
 # Returns
 #  nothing
 #
 showLog(){
+  # ensure log file's dir exits
   [ ! -f $LOG_FILE ] \
-      && [ ! -d $(dirname $LOG_FILE) ] \
-      && mkdir -p $(dirname $LOG_FILE) ];
-  [ ! -f $LOG_FILE ] && touch $LOG_FILE;
+      && [ ! -d $(dirname "$LOG_FILE") ] \
+      && mkdir -p $(dirname "$LOG_FILE") ];
+  # ensure log file exists
+  [ ! -f "$LOG_FILE" ] \
+    && touch "$LOG_FILE";
+  # print hint ?
+  printHint=true;
+  if [ $# -gt 0 ]; then
+    printHint=$1;
+  fi
+  # show log on screen
+  if $printHint; then
+    echo "Opening logfile '$LOG_FILE'.\nPress 'Ctrl+c' to abort.";
+  fi
   tail -n1 -f $LOG_FILE;
 }

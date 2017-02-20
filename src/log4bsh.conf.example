@@ -25,40 +25,90 @@
 #=============================================================================
 set -o nounset;
 
+#
+# Log file, default location is '~/log4bash.log'.
+#
+LOG_FILE="~/log4bash.log";
 
-# override log file if already set
-LOG_FILE="/tmp/myScript.log";
+#
+# Optional log level, default is ''.
+# If it is set the env vars 'TRACE' and 'DEBUG' are ignored.
+# Can be used for fine-granular logging, i.e.
+#
+#  LOG_LEVEL="" (default, same as LOG_LEVEL="ALL:INFO")
+#  LOG_LEVEL="ALL" (same as LOG_LEVEL="ALL:ALL")
+#  LOG_LEVEL="ALL,myScript:INFO"
+#  LOG_LEVEL="ALL:WARN,myScript" (same as LOG_LEVEL="ALL:WARN,myScript:ALL")
+#
+LOG_LEVEL="";
 
-# use log rotate
+#
+# Use log rotate and prevent single log files to grow endless,
+# default is 'true'.
+#
 LOG_ROTATE=true;
 
-# max file size for logs if rotate is enabled
+#
+# Max file size in KB for logs, default is '10485760' (10MB)
+# Ignored if $LOG_ROTATE is disabled.
+#
 MAX_LOG_SIZE=10485760; #10MB
 
-# use colors, if there is no conflicting setting already in place
-if [ -z ${USE_COLORS-} ]; then
-  # not set
-  USE_COLORS=true;
-fi
-
-# enable TRACE messages (if trace is enabled, debug also is)
-TRACE=true;
-
-
+#
+# Use colors for log msgs, default is 'true'.
+#
+USE_COLORS=true;
 
 #
-# 1) define a clean up function
+# Enables DEBUG messages, default is 'false'.
 #
-cleanUp() {
-  echo "This function cleans up.."
+DEBUG=false;
+
+#
+# Enables TRACE messages, default is 'false'.
+# NOTE: If trace is enabled, debug also is.
+#
+TRACE=false;
+
+#
+# Mapping of log levels to custom colors.
+#
+declare -A COLORS;
+LOG4BSH_COLORS["TRACE"]='\033[1;31m';
+LOG4BSH_COLORS["DEBUG"]='\033[1;31m';
+LOG4BSH_COLORS["INFO"]='\033[0;34m';
+LOG4BSH_COLORS["WARN"]='\033[1;31m';
+LOG4BSH_COLORS["ERROR"]='\033[1;31m';
+
+
+#----------------------------------------------------------------------------#
+#                                                                            #
+#                          OPTIONAL FUNCTION HOOKS                           #
+#                                                                            #
+#----------------------------------------------------------------------------#
+
+
+#---------------------------------------------------------
+#
+# Override the exit hook function. It will be called in
+# case of an exit caused by an error message, shortly
+# before 'exit' is called to terminate.
+#
+log4bsh_exitHook() {
+  echo "This function cleans up on exit due to error.."
   rm -Rf /tmp/myScript.tmp.files/;
 }
 
-#
-# 2) Override the hook function, to call clean up.
-#    Will be called in case of an error message, before'exit' is called.
-#
-log4bsh_exitHook() {
-  cleanUp;
-}
 
+#---------------------------------------------------------
+#
+# Override mapping function, remove '.sh' suffix from
+# scripts that are logged.
+#
+log4bsh_mapName() {
+  local scriptName=$1;
+  scriptName="$(basename $scriptName)"; # cut off path name
+  scriptName="${scriptName%%.sh}"; # cut off .sh extension
+  scriptName="${scriptName##-*}";  # cut off leading '-'
+  echo $scriptName;
+}

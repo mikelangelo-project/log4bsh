@@ -44,8 +44,8 @@ printLog() {
 
 #
 # When an error msg is printed, exit is called, but
-# before this happens we want to stop the redirection and
-# then print the log on screen.
+# before this happens stop the redirection and print
+# the log on screen.
 #
 log4bsh_exitHook() {
   stopOutputCapturing;
