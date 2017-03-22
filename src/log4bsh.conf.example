@@ -95,8 +95,7 @@ LOG4BSH_COLORS["ERROR"]='\033[1;31m';
 # before 'exit' is called to terminate.
 #
 log4bsh_exitHook() {
-  echo "This function cleans up on exit due to error.."
-  rm -Rf /tmp/myScript.tmp.files/;
+  :
 }
 
 

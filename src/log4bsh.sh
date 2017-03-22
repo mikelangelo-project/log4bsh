@@ -346,13 +346,14 @@ REDIRECTION_ENABLED=false;
 _log() {
 
   # check amount of params
-  if [ $# -ne 3 ]; then
-    logErrorMsg "Function '_log' called with '$#' arguments, '3' are expected.\
+  if [ $# -lt 2 ]; then
+    logErrorMsg "Function '_log' called with '$#' arguments, '2-3' are expected.\
 \nProvided params are: '$@'" 2;
   fi
 
   local logLevel=$1;
   local logMsg=$2;
+  local printToSTDOUT;
 
   # optional argument provided ?
   local printToSTDout;
@@ -363,12 +364,12 @@ _log() {
   fi
 
   # get caller's name (script file name or parent process if remote)
-  processName="$(getCallerName)";
+  local processName="$(getCallerName)";
 
   #
   # determine if msg should be logged at current level
   #
-  logTheMsg=false;
+  local logTheMsg=false;
   if [ -z "${LOG_LEVEL-}" ]; then
     # no filter defined check TRACE/DEBUG
     if $TRACE \
@@ -378,23 +379,43 @@ _log() {
     fi
   elif [[ "$LOG_LEVEL" =~ $processName:?.*,? ]]; then
     # check if log level is below threshold
-    if [[ "$LOG_LEVEL" =~ "$processName:$logLevel" ]]; then
+    if [[ "$LOG_LEVEL" =~ "$processName:NONE" ]]; then
+      logTheMsg=false;
+    elif [[ "$LOG_LEVEL" =~ "$processName:$logLevel" ]]; then
       logTheMsg=true;
-    elif [[ "$LOG_LEVEL" =~ "$processName:TRACE" ]]\
+    elif [[ "$LOG_LEVEL" =~ "$processName:TRACE" ]] \
         && [[ $logLevel =~ ^(TRACE|DEBUG|INFO|WARN|ERROR)$ ]]; then
       logTheMsg=true;
-    elif [[ "$LOG_LEVEL" =~ "$processName:DEBUG" ]]\
+    elif [[ "$LOG_LEVEL" =~ "$processName:DEBUG" ]] \
         && [[ $logLevel =~ ^(DEBUG|INFO|WARN|ERROR)$ ]]; then
       logTheMsg=true;
-    elif [[ "$LOG_LEVEL" =~ "$processName:INFO" ]]\
+    elif [[ "$LOG_LEVEL" =~ "$processName:INFO" ]] \
         && [[ $logLevel =~ ^(INFO|WARN|ERROR)$ ]]; then
       logTheMsg=true;
-    elif [[ "$LOG_LEVEL" =~ "$processName:WARN" ]]\
+    elif [[ "$LOG_LEVEL" =~ "$processName:WARN" ]] \
         && [[ $logLevel =~ ^(WARN|ERROR)$ ]]; then
       logTheMsg=true;
     fi
-  elif [[ "$LOG_LEVEL" =~ (ALL:?)?($logLevel|ALL) ]]; then
+  elif [[ "$LOG_LEVEL" =~ (ALL:)ALL,?.*$ ]] \
+      || [[ "$LOG_LEVEL" =~ (ALL:)?$logLevel ]]; then
     logTheMsg=true;
+  elif [[ "$LOG_LEVEL" =~ ALL:NONE,?.*$ ]]; then
+    logTheMsg=false;
+  else
+     # no direct match of log level, check if log level is below threshold
+    if [[ "$LOG_LEVEL" =~ (ALL:)?TRACE ]] \
+        && [[ $logLevel =~ ^(TRACE|DEBUG|INFO|WARN|ERROR)$ ]]; then
+      logTheMsg=true;
+    elif [[ "$LOG_LEVEL" =~ (ALL:)?:DEBUG ]] \
+        && [[ $logLevel =~ ^(DEBUG|INFO|WARN|ERROR)$ ]]; then
+      logTheMsg=true;
+    elif [[ "$LOG_LEVEL" =~ (ALL:)?:INFO ]] \
+        && [[ $logLevel =~ ^(INFO|WARN|ERROR)$ ]]; then
+      logTheMsg=true;
+    elif [[ "$LOG_LEVEL" =~ (ALL:)?:WARN ]] \
+        && [[ $logLevel =~ ^(WARN|ERROR)$ ]]; then
+      logTheMsg=true;
+    fi
   fi
 
   # abort here ?
@@ -403,11 +424,16 @@ _log() {
 
   # for shorter log level names, prepend the log message with a space to
   # have all messages starting at the same point, more convenient to read
-  if [[ $logLevel =~ ^(WARN|INFO)$ ]]; then
+  # if there is anything set to debug or trace (skip if "level INFO, only")
+  if [[ $logLevel =~ ^(WARN|INFO)$ ]] \
+       && ([[ "${LOG_LEVEL-}" =~ (TRACE|DEBUG) ]] \
+        || ([ -z ${LOG_LEVEL-} ] \
+             && $DEBUG)); then
     logMsg=" $logMsg";
   fi
 
   # construct log message
+  local printMsg;
   if $USE_COLORS; then
     printMsg="${LOG4BSH_COLORS[$logLevel]}[$LOCALHOST|$(date $DATE_FORMAT)|$processName|$logLevel]$LOG4BSH_NC $logMsg";
   else
@@ -425,7 +451,7 @@ _log() {
   if $LOG_ROTATE \
         && [ -e "$logFile" ]; then
     # ensure log is not bigger than MAX_LOG_SIZE
-    file_size=$(du -b "logFile" | tr -s '\t' ' ' | cut -d' ' -f1);
+    file_size=$(du -b "$logFile" | tr -s '\t' ' ' | cut -d' ' -f1);
     if [ $file_size -ge $MAX_LOG_SIZE ]; then
       mv "$logFile" "$logFile.$(date +%Y-%m-%dT%H-%M-%S)";
       touch "$logFile";
@@ -438,18 +464,18 @@ _log() {
 
   # ensure log file dir exists
   if [ ! -f "$logFile" ] \
-      && [ ! -d $(dirname "$logFile") ] \
-      &&  ! (mkdir -p $(dirname "$logFile") \
-        && touch "$logFile"); then
+        && ([ ! -d $(dirname "$logFile") ] \
+            && [ ! $(mkdir -p $(dirname "$logFile")) ] \
+        || ! touch "$logFile"); then
     echo "ERROR: Cannot write log to '$logFile' !";
     # print to STDOUT at least if not disabled
-    if $printToSTDout; then
+    if $printToSTDOUT; then
         echo -e "$printMsg";
     fi
   elif $REDIRECTION_ENABLED; then
     # when redirection is enabled, print to STDOUT only (otherwise msg appears twice in the log)
     echo -e "$printMsg";
-  elif $printToSTDout; then
+  elif $printToSTDOUT; then
     # print log msg on screen and in file (only if redirection is not enabled
     echo -e "$printMsg" |& tee -a "$logFile";
   else
@@ -581,7 +607,7 @@ captureOutputStreams() {
   # filedescriptors for STDOUT and STDERR both exist ?
   if [ ! -e /proc/$$/fd/1 ] \
       || [ ! -e /proc/$$/fd/2 ]; then #no
-    msg="Cannot capture outputstreams, no filedescriptors '1' and '2' available for process '$$'.";
+    local msg="Cannot capture outputstreams, no filedescriptors '1' and '2' available for process '$$'.";
     # write to log file if possible
     if [ -f "$logFile" ] \
         || $(touch "$logFile"); then
@@ -647,7 +673,12 @@ getCallerName() {
 
   # running via SSH ?
   local process="$(ps --no-headers -o command $PPID | tr -s ' ' | cut -d' ' -f1 | sed 's,:,,g')";
-  local viaSSH=$([[ "$process" =~ sshd$ ]]);
+  local viaSSH=false;
+
+  # running via SSH ?
+  if [[ "$process" =~ sshd$ ]]; then
+    viaSSH=true;
+  fi
 
   # try resolval via PID
   process="$(ps --no-headers -o command $$ | tr -s ' ' | cut -d' ' -f2 | sed 's,:,,g')";
@@ -790,7 +821,7 @@ logTraceMsg() {
   _unsetXFlag $cachedBashOpts;
 
   # log msg
-  _log "TRACE" $@;
+  _log "TRACE" "${1-}" ${2-};
 
   # renable if it was enabled before
   _setXFlag $cachedBashOpts;
@@ -815,7 +846,7 @@ logDebugMsg() {
   _unsetXFlag $cachedBashOpts;
 
   # log msg
-  _log "DEBUG" $@;
+  _log "DEBUG" "${1-}" ${2-};
 
   # renable if it was enabled before
   _setXFlag $cachedBashOpts;
@@ -840,7 +871,7 @@ logInfoMsg() {
   _unsetXFlag $cachedBashOpts;
 
   # print log msg
-  _log "INFO" $@;
+  _log "INFO" "${1-}" ${2-};
 
   # renable if it was enabled before
   _setXFlag $cachedBashOpts;
@@ -865,7 +896,7 @@ logWarnMsg() {
   _unsetXFlag $cachedBashOpts;
 
   # print log message
-  _log "WARN" $@;
+  _log "WARN" "${1-}" ${2-};
 
   # renable if it was enabled before
   _setXFlag $cachedBashOpts;
@@ -892,6 +923,7 @@ logErrorMsg() {
   _unsetXFlag $cachedBashOpts;
 
   # optional argument provided ?
+  local exitCode;
   if [ $# -gt 1 ]; then
     exitCode=$2;
   else
@@ -899,6 +931,7 @@ logErrorMsg() {
   fi
 
   # optional argument provided ?
+  local printToSTDOUT;
   if [ $# -gt 2 ]; then
     printToSTDOUT=$3;
   else
@@ -906,7 +939,7 @@ logErrorMsg() {
   fi
 
   # print log msg
-  _log "ERROR" "$1" $printToSTDOUT;
+  _log "ERROR" "${1-}" $printToSTDOUT;
 
   if $ABORT_ON_ERROR \
       || [ $exitCode -ne 0 ]; then
@@ -941,7 +974,7 @@ logMsg() {
   _unsetXFlag $cachedBashOpts;
 
   # log msg at log level provided
-  _log $@;
+  _log "${1-}" "${2-}" ${3-};
 
   # renable if it was enabled before
   _setXFlag $cachedBashOpts;
@@ -966,6 +999,7 @@ runTimeStats() {
   _unsetXFlag $cachedBashOpts;
 
   # log level given ?
+  local level;
   local ignoreDebugFlag;
   if [ $# -gt 0 ] \
       && [[ $1 =~ ^(TRACE|DEBUG|INFO|WARN|ERROR)$ ]]; then
@@ -1038,7 +1072,7 @@ showLog(){
   [ ! -f "$LOG_FILE" ] \
     && touch "$LOG_FILE";
   # print hint ?
-  printHint=true;
+  local printHint=true;
   if [ $# -gt 0 ]; then
     printHint=$1;
   fi

@@ -1,23 +1,23 @@
-log4bsh
-=======
+# log4bsh
 A simple to use logging library for your bash scripts, written in bash.
-This project is part of the EU funded project MIKELANGELO
 
 
 
-Requirements
-------------
-At least bash version 4.0 is required, because of associative arrays being used.
-Further, following commands need to be available:
- * `sed`
- * `ps`
- * `tail`
- * `mkdir`
+## Table of Contents
+* [Getting Started](#getting-started)
+* [Prerequisites](#prerequisites)
+* [Installation and Removal](#installation-and-removal)
+* [Using a Configuration File](#using-a-configuration-file)
+* [Using Environment Variables for Configuration](#using-environment-variables-for-configuration)
+* [Log Levels](#log-levels)
+* [Configuration Options](#configuration-options)
+* [Logging Functions](#logging-functions)
+* [Function Hooks](#function-hooks)
+* [Acknowledgement](#acknowledgement)
 
 
 
-Getting Started
----------------
+## Getting Started
 To have the logging functions available in your bash-scripts, you need to
 source file `log4bsh.sh` at the begin of your scripts e.g.
 
@@ -32,45 +32,30 @@ exit 0;
 
 
 
-Log Levels
-----------
-There are 5 different log levels, each one serving a specific purpose.
-
-| Log Level      | Purpose        |
-| :---              | :---          |
-| TRACE | Most detailed log output, use it to print all details relevant, i.e. ssh verbose output. `TRACE` needs to be enabled. |
-| DEBUG | More detailed output, use i.e. to indicate current step of processing. `DEBUG` needs to be enabled. |
-| INFO | Info messages, the default message level. Always printed to log. |
-| WARN | Warning messages, use it to indicate something is not as expected. Always printed to log.|
-| ERROR | Error Message, use it in case you cannot continue with the execution. Always printed to log.|
+## Prerequisites
+At least bash version 4.0 is required, because of associative arrays being used.
+Further, following commands need to be available:
+ * `sed`
+ * `ps`
+ * `tail`
+ * `mkdir`
+ * `tee`
 
 
 
-Configuration Options
----------------------
-There are several options available to control the behavior of the logging
-functionality. You either can set environment variables providing these settings
-or a configuration file.
-
-| Config Parameter      | Description        | Default Value |
-| :---              | :---          |:---          |
-| `LOG4BSH_CONFIG_FILE`	| Optional configuration file, overrides all others. | `undefined` |
-| `LOG_FILE`     | Log file for messages. | `~/.log4bsh.log` |
-| `LOG_LEVEL`	| Defines current level for log msgs, allows also to log specific scripts at a certain level | `undefined` (== `ALL:INFO`) |
-| `LOG_ROTATE` | Flag indicating to use log rotate. | `TRUE` |
-| `MAX_LOG_SIZE` | Maximum size for log files in bytes. | `5242880` (= 5MB) |
-| `ABORT_ON_ERROR ` | Flag indicating the default behaviour for error messages |  `TRUE ` |
-| `PRINT_TO_STDOUT` | Flag indicating to print messages to log and `STDOUT` | `FALSE` |
-| `DATE_FORMAT` | Date format for log messages. | `+%Y-%m-%dT%H:%M:%S` |
-| `USE_COLORS` | Use colors for log messages | `TRUE` |
-| `COLORS`	| Allows to override default colors for log levels. Associative array, with keys: TRACE,DEBUG,INFO,WARN,ERROR | `TRACE->lblue`, `DEBUG->blue`, `INFO->green`, `WARN->orange`, `ERROR->red` |
-| `DEBUG` | Indicates to print msg at level 'DEBUG'. Ignored if LOG_LEVEL is set. | `FALSE` |
-| `TRACE` | Indicates to print msg at level 'TRACE'. Ignored if LOG_LEVEL is set. | `FALSE` |
+## Installation and Removal
+For the installation, use call
+```bash
+./setup.sh [--prefix=<dir>] [--userspace]
+```
+To remove log4bsh, use
+```bash
+./setup.sh [--prefix=<dir>] [--userspace]
+```
 
 
 
-Using a Configuration File
---------------------------
+## Using a Configuration File
 If there is no configuration file, the default values listed in the table above
 will be applied. However, if you want to change a certain option or all of them,
 you can provide a configuration file the following ways:
@@ -86,7 +71,7 @@ use file
 
 You may consider already set environment variables, and apply them only in
 in case they are not set. For example:
-```
+```bash
 #!/bin/bash
 if [ -z ${USE_COLORS-} ]; then
   # not set
@@ -95,9 +80,7 @@ fi
 ```
 
 
-
-Using Environment Variables for Configuration
----------------------------------------------
+## Using Environment Variables for Configuration
 All configuration options can be applied via the environment, too.
 This allows you, for example, to enable `DEBUG` or `TRACE` for certain code
 section and disable it afterwards again. Or to log the output of specific
@@ -128,8 +111,7 @@ exit 0;
 ```
 
 However there is no need to touch your scripts. If you want to modify the log
-level for a specific script, you can do so from the outside.  
-Example:
+level for a specific script, you can do so from the outside.
 ```bash
 #!/bin/bash
 
@@ -139,8 +121,44 @@ export  LOG_LEVEL="ALL:WARN,myScript.sh:TRACE";
 ```
 
 
-Logging Functions
------------------
+
+## Log Levels
+There are 5 different log levels, each one serving a specific purpose.
+
+| Log Level      | Purpose        |
+| :---              | :---          |
+| TRACE | Most detailed log output, use it to print all details relevant, i.e. ssh verbose output. `TRACE` needs to be enabled. |
+| DEBUG | More detailed output, use i.e. to indicate current step of processing. `DEBUG` needs to be enabled. |
+| INFO | Info messages, the default message level. Always printed to log. |
+| WARN | Warning messages, use it to indicate something is not as expected. Always printed to log. |
+| ERROR | Error Message, use it in case you cannot continue with the execution. Always printed to log. |
+| NONE | Do not print any log messages. |
+
+
+
+## Configuration Options
+There are several options available to control the behavior of the logging
+functionality. You either can set environment variables providing these settings
+or a configuration file.
+
+| Config Parameter      | Description        | Default Value |
+| :---              | :---          |:---          |
+| `LOG4BSH_CONFIG_FILE`	| Optional configuration file, overrides all others. | `undefined` |
+| `LOG_FILE`     | Log file for messages. | `~/.log4bsh.log` |
+| `LOG_LEVEL`	| Defines current level for log msgs, allows also to log specific scripts at a certain level | `undefined` (== `ALL:INFO`) |
+| `LOG_ROTATE` | Flag indicating to use log rotate. | `TRUE` |
+| `MAX_LOG_SIZE` | Maximum size for log files in bytes. | `5242880` (= 5MB) |
+| `ABORT_ON_ERROR ` | Flag indicating the default behaviour for error messages |  `TRUE ` |
+| `PRINT_TO_STDOUT` | Flag indicating to print messages to log and `STDOUT` | `FALSE` |
+| `DATE_FORMAT` | Date format for log messages. | `+%Y-%m-%dT%H:%M:%S` |
+| `USE_COLORS` | Use colors for log messages | `TRUE` |
+| `COLORS`	| Allows to override default colors for log levels. Associative array, with keys: TRACE,DEBUG,INFO,WARN,ERROR | `TRACE->lblue`, `DEBUG->blue`, `INFO->green`, `WARN->orange`, `ERROR->red` |
+| `DEBUG` | Indicates to print msg at level 'DEBUG'. Ignored if LOG_LEVEL is set. | `FALSE` |
+| `TRACE` | Indicates to print msg at level 'TRACE'. Ignored if LOG_LEVEL is set. | `FALSE` |
+
+
+
+## Logging Functions
 List of functions provided to you by `log4bsh.sh`.
 
 * **`captureOutputStreams`**
@@ -150,11 +168,11 @@ List of functions provided to you by `log4bsh.sh`.
        situations where you do not have the `STDOUT` available on your
        screen while the script runs.
   *  Parameter:
-    * `$1`: Optional flag, force capturing that happens per default in case
+     * `$1`: Optional flag, force capturing that happens per default in case
           `DEBUG` or `TRACE` is enabled, only.
   *  Returns:
-    * `0`: in case of success, redirection is enabled
-    * `1`: if not enabled, e.g. DEBUG not active
+     * `0`: in case of success, redirection is enabled
+     * `1`: if not enabled, e.g. DEBUG not active
 
 * **`stopOutputCapturing`**
   *  Description:
@@ -162,8 +180,8 @@ List of functions provided to you by `log4bsh.sh`.
   *  Parameter:
        none
   *  Returns:
-    * `0`: in case of success
-    * `1`: if streams where not captured (nothing to do)
+     * `0`: in case of success
+     * `1`: if streams where not captured (nothing to do)
 
 * **`getCallerName`**
   *  Description:
@@ -178,8 +196,8 @@ List of functions provided to you by `log4bsh.sh`.
   *  Description:
        Logs the name of the parent process that calls your script.
   *  Parameter:
-    * `$1`: Optional string log level; default is `DEBUG`.
-    * `$2`: Optional boolean indicating to print to `STDOUT`.
+     * `$1`: Optional string log level; default is `DEBUG`.
+     * `$2`: Optional boolean indicating to print to `STDOUT`.
   *  Returns:
        nothing
 
@@ -187,8 +205,8 @@ List of functions provided to you by `log4bsh.sh`.
   *  Description:
        Logs parent script's cmd line, including arguments.
   *  Parameter:
-    * `$1`: Optional string log level; default is `DEBUG`.
-    * `$2`: Optional boolean indicating to print to `STDOUT`.
+     * `$1`: Optional string log level; default is `DEBUG`.
+     * `$2`: Optional boolean indicating to print to `STDOUT`.
   *  Returns:
        nothing
 
@@ -196,8 +214,8 @@ List of functions provided to you by `log4bsh.sh`.
   *  Description:
        Logs a trace message, if `TRACE` is `true`.
   *  Parameter:
-    * `$1`: The message to log.
-    * `$2`: Optional boolean indicating to print to `STDOUT`.
+     * `$1`: The message to log.
+     * `$2`: Optional boolean indicating to print to `STDOUT`.
   *  Returns:
        nothing
 
@@ -205,8 +223,8 @@ List of functions provided to you by `log4bsh.sh`.
   *  Description:
        Logs a debug message, if `DEBUG` is `true`.
   *  Parameter:
-    * `$1`: The message to log.
-    * `$2`: Optional boolean indicating to print to `STDOUT`.
+     * `$1`: The message to log.
+     * `$2`: Optional boolean indicating to print to `STDOUT`.
   *  Returns:
        nothing
 
@@ -214,8 +232,8 @@ List of functions provided to you by `log4bsh.sh`.
   *  Description:
        Logs an info message.
   *  Parameter:
-    * `$1`: The message to log.
-    * `$2`: Optional boolean indicating to print to `STDOUT`.
+     * `$1`: The message to log.
+     * `$2`: Optional boolean indicating to print to `STDOUT`.
   *  Returns:
        nothing
 
@@ -223,8 +241,8 @@ List of functions provided to you by `log4bsh.sh`.
   *  Description:
        Logs a warn message.
   *  Parameter:
-    * `$1`: The message to log.
-    * `$2`: Optional boolean indicating to print to `STDOUT`.
+     * `$1`: The message to log.
+     * `$2`: Optional boolean indicating to print to `STDOUT`.
   *  Returns:
        nothing
 
@@ -232,8 +250,8 @@ List of functions provided to you by `log4bsh.sh`.
   *  Description:
        Logs an error message and exits.
   *  Parameter:
-    * `$1`: The message to log.
-    * `$2`: Optional boolean indicating to print to `STDOUT`.
+     * `$1`: The message to log.
+     * `$2`: Optional boolean indicating to print to `STDOUT`.
   *  Returns:
        nothing
 
@@ -263,8 +281,7 @@ List of functions provided to you by `log4bsh.sh`.
 
 
 
-Function Hooks
---------------
+## Function Hooks
 There are function hooks provided, too. These functions are dummy functions
 without any logic so far. They are intended to be overridden if needed.
 
@@ -294,11 +311,10 @@ without any logic so far. They are intended to be overridden if needed.
 
 
 
-Acknowledgement
----------------
+## Acknowledgement
 This Horizon2020 EU project has been conducted within the RIA
  [MIKELANGELO project](https://www.mikelangelo-project.eu/) (no. 645402).
 Started in January 2015, and co-funded by the European Commission under
 > H2020-ICT- 07-2014: Advanced Cloud Infrastructures and Services program.
 
-There is more of MIKELANGELO, checkout [Github](https://github.com/mikelangelo-project)
+There is more of MIKELANGELO on [Github](https://github.com/mikelangelo-project)

@@ -19,17 +19,27 @@
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../src/log4bsh.sh";
 
 # override log file
-LOG_FILE="/tmp/test-03.log";
+LOG_FILE="/tmp/test-05.log";
 
-# override date format
-DATE_FORMAT="+%H:%M:%S";
+#
+# set log level to debug
+#
+# note:
+# since there are no additional files it is the same like 'example-05.sh:WARN'
+LOG_LEVEL="ALL:WARN";
 
-# override print2stdout
-PRINT_TO_STDOUT=false;
 
-# enable trace messages (also enables debug)
-TRACE=true;
 
+# override mapping function dummy
+log4bsh_mapName() {
+
+  local runningScript=$1;
+
+  runningScript="${process%%.sh}"; # cut off .sh extension
+  runningScript="${runningScript##-*}";  # cut off leading '-'
+  runningScript="$(basename $runningScript)";
+  echo $runningScript;
+}
 
 
 #

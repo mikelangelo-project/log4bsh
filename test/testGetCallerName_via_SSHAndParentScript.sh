@@ -6,16 +6,16 @@
 ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)";
 
 # script to execute
-scriptToExec="$ABSOLUTE_PATH/testGetCallerName.sh";
+scriptToExec="$ABSOLUTE_PATH/testGetCallerName_via_parentScript.sh";
 
 # get caller name via SSH
-callerName="$($scriptToExec false)";
+callerName="$(ssh localhost \"$scriptToExec false\" 2>/dev/null)";
 
 # check result ?
 if [ $# -eq 0 ] || $1; then
-  if [ "$callerName" != "$(basename $scriptToExec)" ]; then
+  if [ "$callerName" != "sshd:testGetCallerName.sh" ]; then
     echo "Test '$0' failed!";
-    echo "expected: '$(basename $scriptToExec)', returned: '$callerName'";
+    echo "expected: 'sshd:testGetCallerName.sh', returned: '$callerName'";
     exit 1;
   else
     echo "Test '$0' passed.";

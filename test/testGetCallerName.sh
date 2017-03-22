@@ -11,14 +11,16 @@ callerName=$(getCallerName);
 
 # check result ?
 if [ $# -eq 0 ] || $1; then
-    if [ "$callerName" != "$(basename $0)" ]; then
-        echo "Test '$0' failed!";
-        echo "Caller: $callerName";
-    else
-        echo "Test '$0' passed.";
-    fi
+  if [ "$callerName" != "$(basename $0)" ]; then
+    echo "Test '$0' failed!";
+    echo "expected: '$(basename $0)', returned: '$callerName'";
+    exit 1;
+  else
+    echo "Test '$0' passed.";
+  fi
 else
-    echo $callerName;
+  # called by other test scripts
+  echo $callerName;
 fi
 
 exit 0;

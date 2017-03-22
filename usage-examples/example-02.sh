@@ -27,11 +27,9 @@ DATE_FORMAT="+%H:%M:%S";
 # override print2stdout
 PRINT_TO_STDOUT=false;
 
-# enable debug messages
-DEBUG=false;
+# enable debug messages (but not trace)
+DEBUG=true;
 
-# enable trace messages
-TRACE=false;
 
 # override mapping function dummy
 log4bsh_mapName() {
