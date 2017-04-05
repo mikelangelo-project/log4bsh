@@ -9,6 +9,7 @@ A simple to use logging library for your bash scripts, written in bash.
 * [Installation and Removal](#installation-and-removal)
 * [Using a Configuration File](#using-a-configuration-file)
 * [Using Environment Variables for Configuration](#using-environment-variables-for-configuration)
+* [Dedicated Log Files](#dedicated-log-files)
 * [Log Levels](#log-levels)
 * [Configuration Options](#configuration-options)
 * [Logging Functions](#logging-functions)
@@ -18,47 +19,53 @@ A simple to use logging library for your bash scripts, written in bash.
 
 
 ## Getting Started
-To have the logging functions available in your bash-scripts, you need to
-source file `log4bsh.sh` at the begin of your scripts e.g.
+To have the logging functions available in your bash-scripts, you either need to run the
+`setup.sh` or to source file `log4bsh.sh` at the begin of your scripts e.g.
 
 ```bash
-#!/bin/bash
-source log4bsh/src/log4bash.sh;
-#..your code..
-logInfoMsg "Hello World!";
-#..more of your code..
-exit 0;
+ #!/bin/bash
+ source log4bsh/src/log4bash.sh; #not needed if setup.sh was run
+ #..your code..
+ logInfoMsg "Hello World!";
+ #..more of your code..
+ exit 0;
 ```
 
 
 
 ## Prerequisites
-At least bash version 4.0 is required, because of associative arrays being used.
+At least bash version 4.0 is required, because of associative arrays being used.  
 Further, following commands need to be available:
- * `sed`
- * `ps`
- * `tail`
- * `mkdir`
- * `tee`
+ * `mkdir` (package [coreutils](https://www.gnu.org/software/coreutils/coreutils.html))
+ * `tail` (package [coreutils](https://www.gnu.org/software/coreutils/coreutils.html))
+ * `tee` (package [coreutils](https://www.gnu.org/software/coreutils/coreutils.html))
+ * `ps` (package [procps](http://procps.sourceforge.net/))
+ * `sed` (package sed [procps](http://sed.sourceforge.net/))
 
 
 
 ## Installation and Removal
-For the installation, use call
-```bash
+To install log4bsh, run command
+```
 ./setup.sh [--prefix=<dir>] [--userspace]
 ```
+If you do not provide a prefix log4bsh is installed to `/usr/share/log4bsh/`
+or to `$HOME/lib/` in case of an userspace installation.
+Make use of `--userspace` if you want to install it for your user, only.
+A system wide installation requires root permissions.
+
 To remove log4bsh, use
-```bash
-./setup.sh [--prefix=<dir>] [--userspace]
+```
+./setup.sh --uninstall [--prefix=<dir>] [--userspace]
 ```
 
 
 
 ## Using a Configuration File
-If there is no configuration file, the default values listed in the table above
-will be applied. However, if you want to change a certain option or all of them,
-you can provide a configuration file the following ways:
+If there is no configuration file, the default values will be applied,
+see [Configuration Options](#configuration-options).  
+However, if you want to change a certain option or all of them, you can
+provide a configuration file in the following ways:
 
 For a system wide configuration, use file
 * `/etc/log4bash.conf`
@@ -69,92 +76,104 @@ use file
 * `$HOME/log4bash.conf`
 * If not found, it is search for file `$HOME/.log4bash.conf`
 
-You may consider already set environment variables, and apply them only in
+Note: You may consider already set environment variables, and apply them only in
 in case they are not set. For example:
 ```bash
-#!/bin/bash
-if [ -z ${USE_COLORS-} ]; then
-  # not set
-  USE_COLORS=true;
-fi
+ #!/bin/bash
+ if [ -z ${USE_COLORS-} ]; then
+   # not set
+   USE_COLORS=true;
+ fi
 ```
 
 
 ## Using Environment Variables for Configuration
-All configuration options can be applied via the environment, too.
-This allows you, for example, to enable `DEBUG` or `TRACE` for certain code
-section and disable it afterwards again. Or to log the output of specific
-sub-scripts into their own log file by providing a dedicated LOG_FILE
-setting for each one.
+All configuration options can also be set inside scripts. This allows you, for
+example, to enable flag `DEBUG` or `TRACE` for a code section and disable it
+afterwards again.
 
 ```bash
-#!/bin/bash
-#
-# this file is called by another script that has linked the log4bsh.sh file.
-# To write to a separate log file, define it separately in this script
-# some options different from the parent script's configuration.
-LOG_FILE="/tmp/myScript_XYZ.log";
+ #!/bin/bash
 
-# ..some code..
+ # ..some code..
 
-# now increase the log level to TRACE
-TRACE=true;
+ # now increase the log level to TRACE
+ TRACE=true;
 
-# ..some more code where you want to print trace messages..
+ # ..some more code where you want to print trace messages..
 
-# now disable trace output again
-TRACE=false;
+ # now disable trace output again
+ TRACE=false;
 
-# ..more code..
-
-exit 0;
+ # ..more code..
+ 
+ exit 0;
 ```
 
-However there is no need to touch your scripts. If you want to modify the log
-level for a specific script, you can do so from the outside.
+However, there is no need to touch your scripts. If you want to modify the log
+level for a specific script, you can do so before executing your script from the
+outside by the help of environment variables .
 ```bash
-#!/bin/bash
-
-# set overall logging level to WARN, but for myScript.sh set it to TRACE
-export  LOG_LEVEL="ALL:WARN,myScript.sh:TRACE";
-./myScriptThatUsesLog4bsh.sh
+ # set overall logging level to WARN, but for myScript.sh set it to TRACE
+ export LOG_LEVEL="ALL:WARN,myScript.sh:TRACE";
+ ./myScript.sh
 ```
 
+## Dedicated Log Files
+You have the opportunity to define by the help of hook function
+`log4bsh_getLogFileName` dedicated log files, dependent on the script that
+logs messages.
+
+```bash
+ # write 'myScript.sh' messages to a separate log file, but all others to the
+ # default log file '$LOG_FILE'
+ log4bsh_getLogFileName() {
+   if [ "${1-}" == "myScript.sh" ]; then
+     echo "/tmp/myScript.log";
+   else
+     echo "$LOG_FILE";
+   fi
+ }
+```
 
 
 ## Log Levels
-There are 5 different log levels, each one serving a specific purpose.
+There are 5 different log levels, in addition to `NONE`, each one serving a specific purpose.
+Lowest level is `ERROR`, default level is `INFO` and most verbose log level is `TRACE`.
 
 | Log Level      | Purpose        |
 | :---              | :---          |
-| TRACE | Most detailed log output, use it to print all details relevant, i.e. ssh verbose output. `TRACE` needs to be enabled. |
-| DEBUG | More detailed output, use i.e. to indicate current step of processing. `DEBUG` needs to be enabled. |
-| INFO | Info messages, the default message level. Always printed to log. |
-| WARN | Warning messages, use it to indicate something is not as expected. Always printed to log. |
-| ERROR | Error Message, use it in case you cannot continue with the execution. Always printed to log. |
-| NONE | Do not print any log messages. |
+| TRACE | Most detailed log output, use it to print all details relevant, e.g. content of generated files. |
+| DEBUG | More detailed output, use e.g. to indicate current step of processing. |
+| INFO | Info messages, the default log level. Always logged except log level `NONE` is set. |
+| WARN | Warning messages, use it to indicate something is not as expected. Always logged, except log level `NONE` is set. |
+| ERROR | Error messages, use it to indicate sth went wrong. Always logged, except log level `NONE` is set. |
+| NONE | Do not log any messages. |
 
 
 
 ## Configuration Options
 There are several options available to control the behavior of the logging
-functionality. You either can set environment variables providing these settings
-or a configuration file.
+functionality.
+You either can set environment variables providing these settings
+or use a configuration file as described in sections
+[Using Environment Variables for Configuration](#using-environment-variables-for-configuration)
+and [Using a Configuration File](#using-a-configuration-file).
 
 | Config Parameter      | Description        | Default Value |
 | :---              | :---          |:---          |
-| `LOG4BSH_CONFIG_FILE`	| Optional configuration file, overrides all others. | `undefined` |
-| `LOG_FILE`     | Log file for messages. | `~/.log4bsh.log` |
-| `LOG_LEVEL`	| Defines current level for log msgs, allows also to log specific scripts at a certain level | `undefined` (== `ALL:INFO`) |
+| `LOG4BSH_CONFIG_FILE` | Optional configuration file, overrides all others. | `undefined` |
+| `LOG_FILE` | Log file for messages. | `~/.log4bsh.log` |
+| `LOG_LEVEL` | Defines current level for log msgs, allows also to log specific scripts at a certain level | `undefined` (== `ALL:INFO`) |
 | `LOG_ROTATE` | Flag indicating to use log rotate. | `TRUE` |
 | `MAX_LOG_SIZE` | Maximum size for log files in bytes. | `5242880` (= 5MB) |
-| `ABORT_ON_ERROR ` | Flag indicating the default behaviour for error messages |  `TRUE ` |
+| `ABORT_ON_ERROR` | Flag indicating the default behavior for error messages |  `TRUE ` |
 | `PRINT_TO_STDOUT` | Flag indicating to print messages to log and `STDOUT` | `FALSE` |
 | `DATE_FORMAT` | Date format for log messages. | `+%Y-%m-%dT%H:%M:%S` |
 | `USE_COLORS` | Use colors for log messages | `TRUE` |
-| `COLORS`	| Allows to override default colors for log levels. Associative array, with keys: TRACE,DEBUG,INFO,WARN,ERROR | `TRACE->lblue`, `DEBUG->blue`, `INFO->green`, `WARN->orange`, `ERROR->red` |
-| `DEBUG` | Indicates to print msg at level 'DEBUG'. Ignored if LOG_LEVEL is set. | `FALSE` |
-| `TRACE` | Indicates to print msg at level 'TRACE'. Ignored if LOG_LEVEL is set. | `FALSE` |
+| `COLORS` | Allows to override default colors for log levels. Associative array, with keys: TRACE,DEBUG,INFO,WARN,ERROR | `TRACE->lblue`, `DEBUG->blue`, `INFO->green`, `WARN->orange`, `ERROR->red` |
+| `DEBUG` | Indicates to print msg at level 'DEBUG' or below. Ignored if LOG_LEVEL is set. | `FALSE` |
+| `TRACE` | Indicates to print msg at level 'TRACE' or below. Ignored if LOG_LEVEL is set. | `FALSE` |
 
 
 
@@ -282,8 +301,8 @@ List of functions provided to you by `log4bsh.sh`.
 
 
 ## Function Hooks
-There are function hooks provided, too. These functions are dummy functions
-without any logic so far. They are intended to be overridden if needed.
+There are several function hooks available implemented as dummy functions
+without any logic. These are intended to be overridden as needed.
 
 * **`log4bsh_mapName`**
   *  Description:  Allows you to map file names to certain entity names.
@@ -291,15 +310,15 @@ without any logic so far. They are intended to be overridden if needed.
                    output, or use short names for specific process names or
                    your (sub-)scripts in the logging output.
   *  Parameter:
-    * `$1`: Name of a script or process.
+     * `$1`: Name of a script or process.
   *  Returns: Nothing per default, however the (mapped/non-mapped) name is
               printed via echo to `STDOUT`.
 
 * **`log4bsh_getLogFileName`**
   *  Description:  Allows you have dedicated log files for your scripts,
-                   dependent on the actual script's name.
+                   dependent on the actual script's name that logs messages.
   *  Parameter:
-    * `$1`: Name of a script or process.
+     * `$1`: Name of a script or process.
   *  Returns: Nothing per default, however the log file name is
               printed via echo to `STDOUT`.
 
