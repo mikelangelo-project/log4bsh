@@ -47,9 +47,14 @@
 BASE_DIR=$(cd $(dirname ${BASH_SOURCE[0]}) && pwd);
 
 #
-# Default installation dir
+# Default installation dir for system wide installations.
 #
-DEFAULT_PREFIX="/usr/share";
+DEFAULT_PREFIX=/usr/share;
+
+#
+# Default installation dir for user space installations.
+#
+DEFAULT_PREFIX_USERSPACE=~/lib;
 
 
 
@@ -121,8 +126,7 @@ parseArguments() {
     case "$1" in
 
       --prefix*)
-          PREFIX=${1#--prefix};
-          PREFIX=${PREFIX#=};
+          PREFIX=${1#--prefix=};
           [ -z ${PREFIX-} ] && usage;
           shift;;
 
@@ -145,22 +149,26 @@ parseArguments() {
   done
 
   # userspace or system wide installation ?
-  if $USERSPACE \
-      && [ $(uid -u) -ne 0 ]; then
-    echo "Cannot install log4bsh systemwide as user, please use root/sudo instead.";
+  if ! $USERSPACE \
+      && [ $(id -u) -ne 0 ]; then
+    echo "Cannot install log4bsh system-wide as standard user, please use root/sudo instead.";
     exit 1;
   fi
 
   # prefix provided ?
   if [ -z ${PREFIX-} ]; then
-    PREFIX=$DEFAULT_PREFIX;
+    if $USERSPACE; then
+      PREFIX=$DEFAULT_PREFIX_USERSPACE;
+    else
+      PREFIX=$DEFAULT_PREFIX;
+    fi
   fi
 
   # is it a valid dir ?
   if [ ! -d $PREFIX ] \
       && [ ! `mkdir -p $PREFIX` ]; then
-    echo "Installation path '$PREFIX' is not a directory and connot be created."
-    usage;
+    echo "Installation path '$PREFIX' is not a directory and cannot be created.";
+    exit 1;
   fi
 
   return 0;
@@ -182,6 +190,13 @@ copyFiles() {
   local destDir="$PREFIX/log4bsh";
   local destFile;
 
+  # ensure dir exists ?
+  if [ ! -d "$destDir" ] \
+      && [ ! `mkdir -p "$destDir"` ]; then
+    echo "Destination path '$destDir' is not a directory and cannot be created.";
+    exit 1;
+  fi
+
   # ensure we can read/write files
   if [ ! -r "$destDir" ] || [ ! -w "$destDir" ]; then
     echo "Check permissions of dir '$destDir', cannot read/write files.";
@@ -189,7 +204,7 @@ copyFiles() {
   fi
 
   # copy log4bsh
-  echo "Installing log4bsh in dir '$destDir'";
+  echo "Installing log4bsh to dir '$destDir'";
   cp $BASE_DIR/src/log4bsh.sh $destDir/;
 
   # success ?
@@ -288,15 +303,21 @@ setProfile() {
 
   local profile;
 
-  if $USER_SPACE; then
+  # users space or system wide profile ?
+  if $USERSPACE; then
     profile=~/.bashrc;
   else
     profile=/etc/profile.d/99-log4bsh.sh;
   fi
 
-  if [ -z "$(cat $profile | grep source | grep log4bsh.sh)" ]; then
-    echo "source $PREFIX/log4bsh.sh" >> $profile;
+  # already present ?
+if [ -z "$(grep -E '^(source|\.)\ $PREFIX/log4bsh.sh' $profile)" ]; then
+    # comment out any existing source-ing of log4bsh
+    sed -i -E 's,^(source|\.)(\ .*log4bsh.sh.*)$,#\1\2,g' $profile;
+    # add to profile
+    echo "source $PREFIX/log4bsh/log4bsh.sh" >> $profile;
   fi
+
   return 0;
 }
 
@@ -313,10 +334,10 @@ setProfile() {
 #
 clearProfile() {
 
-  if $USER_SPACE; then
+  if $USERSPACE; then
     local profile=~/.bashrc;
-    if [ -z "$(cat $profile | grep source | grep log4bsh.sh)" ]; then
-      sed -E 's,source\ .*log4bsh.sh,,g' $profile;
+    if [ -n "$(cat $profile | grep -E '^(source|\.)\ $PREFIX/log4bsh.sh')" ]; then
+      sed -E 's,^(source|\.)\ .*log4bsh.sh.*$,,g' $profile;
     fi
   else
     rm -f /etc/profile.d/99-log4bsh.sh;

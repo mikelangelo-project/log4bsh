@@ -106,7 +106,7 @@ afterwards again.
  TRACE=false;
 
  # ..more code..
- 
+
  exit 0;
 ```
 
