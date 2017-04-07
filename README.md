@@ -50,7 +50,7 @@ To install log4bsh, run command
 ./setup.sh [--prefix=<dir>] [--userspace]
 ```
 If you do not provide a prefix log4bsh is installed to `/usr/share/log4bsh/`
-or to `$HOME/lib/` in case of an userspace installation.
+or to `$HOME/lib/log4bsh/` in case of an userspace installation.
 Make use of `--userspace` if you want to install it for your user, only.
 A system wide installation requires root permissions.
 
