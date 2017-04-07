@@ -109,7 +109,6 @@
 #     2017-02-22  v0.2  N.Struckmann    some bug fixes, config enhanced
 #
 #=============================================================================
-set -o nounset;
 
 # determine our base directory
 LOG4BSH_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)";
@@ -443,7 +442,7 @@ _log() {
   #
   # get log file name
   #
-  local logFile="$(log4bsh_getLogFileName)";
+  local logFile="$(log4bsh_getLogFileName $processName)";
 
   #
   # log rotate, if enabled
@@ -466,7 +465,7 @@ _log() {
   if [ ! -f "$logFile" ] \
         && ([ ! -d $(dirname "$logFile") ] \
             && [ ! $(mkdir -p $(dirname "$logFile")) ] \
-        || ! touch "$logFile"); then
+        || ! $(touch "$logFile")); then
     echo "ERROR: Cannot write log to '$logFile' !";
     # print to STDOUT at least if not disabled
     if $printToSTDOUT; then
@@ -703,6 +702,9 @@ getCallerName() {
       fi
     elif [[ "$process" =~ notty$ ]]; then
         process="$(ps --no-headers -o command $$ | tr -s ' ' | cut -d' ' -f2)";
+    elif [[ "$process" =~ @(pts|tty) ]]; then
+      # running in shell, not inside a script
+      process="bash";
     fi
   fi
 
