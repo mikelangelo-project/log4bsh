@@ -138,17 +138,17 @@ logs messages.
 
 
 ## Log Levels
-There are 5 different log levels, in addition to `NONE`, each one serving a specific purpose.
+There are 5 different log levels, in addition to `QUIET`, each one serving a specific purpose.
 Lowest level is `ERROR`, default level is `INFO` and most verbose log level is `TRACE`.
 
 | Log Level      | Purpose        |
 | :---              | :---          |
 | TRACE | Most detailed log output, use it to print all details relevant, e.g. content of generated files. |
 | DEBUG | More detailed output, use e.g. to indicate current step of processing. |
-| INFO | Info messages, the default log level. Always logged except log level `NONE` is set. |
-| WARN | Warning messages, use it to indicate something is not as expected. Always logged, except log level `NONE` is set. |
-| ERROR | Error messages, use it to indicate sth went wrong. Always logged, except log level `NONE` is set. |
-| NONE | Do not log any messages. |
+| INFO | Info messages, the default log level. Always logged except log level `QUIET` is set. |
+| WARN | Warning messages, use it to indicate something is not as expected. Always logged, except log level `QUIET` is set. |
+| ERROR | Error messages, use it to indicate sth went wrong. Always logged, except log level `QUIET` is set. |
+| QUIET | Do not log any messages. |
 
 
 

@@ -188,7 +188,7 @@ LOCALHOST="$(hostname -s)";
 #
 # Colors used for log messages.
 #
-LOG4BSH_RED='\033[0;31m';
+LOG4BSH_RED='\033[1;31m';
 LOG4BSH_ORANGE='\033[0;33m';
 LOG4BSH_GREEN='\033[0;32m';
 LOG4BSH_BLUE='\033[0;34m';
@@ -378,7 +378,7 @@ _log() {
     fi
   elif [[ "$LOG_LEVEL" =~ $processName:?.*,? ]]; then
     # check if log level is below threshold
-    if [[ "$LOG_LEVEL" =~ "$processName:NONE" ]]; then
+    if [[ "$LOG_LEVEL" =~ "$processName:QUIET" ]]; then
       logTheMsg=false;
     elif [[ "$LOG_LEVEL" =~ "$processName:$logLevel" ]]; then
       logTheMsg=true;
@@ -398,7 +398,7 @@ _log() {
   elif [[ "$LOG_LEVEL" =~ (ALL:)ALL,?.*$ ]] \
       || [[ "$LOG_LEVEL" =~ (ALL:)?$logLevel ]]; then
     logTheMsg=true;
-  elif [[ "$LOG_LEVEL" =~ ALL:NONE,?.*$ ]]; then
+  elif [[ "$LOG_LEVEL" =~ ALL:QUIET,?.*$ ]]; then
     logTheMsg=false;
   else
      # no direct match of log level, check if log level is below threshold
@@ -463,9 +463,9 @@ _log() {
 
   # ensure log file dir exists
   if [ ! -f "$logFile" ] \
-        && ([ ! -d $(dirname "$logFile") ] \
-            && [ ! $(mkdir -p $(dirname "$logFile")) ] \
-        || ! $(touch "$logFile")); then
+        && (([ ! -d $(dirname "$logFile") ] \
+              && [ 0 -ne $(mkdir -p $(dirname "$logFile"); echo $?) ]) \
+            || [ 0 -ne $(touch "$logFile"; echo $?) ]); then
     echo "ERROR: Cannot write log to '$logFile' !";
     # print to STDOUT at least if not disabled
     if $printToSTDOUT; then
