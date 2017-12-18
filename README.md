@@ -274,11 +274,21 @@ List of functions provided to you by `log4bsh.sh`.
   *  Returns:
        nothing
 
+* **`printRuntime`**
+  *  Description:
+       Prints runtime statistics for your bash script.
+  *  Parameter:
+      * `$1`: Name of script to print measurement for.
+      * `$2`: start time in (nano)seconds (use: date +%s.%N).
+      * `$3`: Debug level (optional).
+  *  Returns:
+       nothing
+
 * **`runTimeStats`**
   *  Description:
-       Prints runtime statistics for your script.
+       Prints runtime statistics for your zsh/ksh script.
   *  Parameter:
-       none
+       * `$1`: Debug level (optional).
   *  Returns:
        nothing
 

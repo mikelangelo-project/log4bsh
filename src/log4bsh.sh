@@ -714,9 +714,16 @@ getCallerName() {
     process="$(log4bsh_mapName $process)";
   fi
 
+  # via SSH ?
   if $viaSSH; then
-   process="sshd:$process";
+    # process is a forked function call ?
+    if [ -n "$process" ]; then
+      process="forked_proc";
+    fi
+    process="sshd:$process";
   fi
+
+  # print info on STDOUT
   echo $process;
 }
 
@@ -987,6 +994,50 @@ logMsg() {
 #
 # Prints simple runtime statistics for a script by the
 # help of cmd 'times', as debug msg per default.
+#
+# Parameter
+#  $1: name of script measured
+#  $2: start time (date +%s.%N)
+#  $3: log level
+#
+# Returns
+#  nothing
+#
+printRuntime() {
+
+  # ensure argument count is correct
+  if [ $# -lt 2 ] || [ $# -gt 3 ]; then
+    echo "Error log4bsh function 'printRuntime' expects '2-3' arguments, provided '$#'\nProvided params are: '$@'";
+    return 1;
+  fi
+
+  scriptName=$1;
+  start=$2;
+  end=$(date +%s.%N);
+  runtime=$(echo "$end - $start" | bc);
+
+  # log level given ?
+  local level;
+  local ignoreDebugFlag;
+  if [ $# -gt 2 ] \
+      && [[ $3 =~ ^(TRACE|DEBUG|INFO|WARN|ERROR)$ ]]; then
+    level=$1;
+    ignoreDebugFlag=true;
+  else
+    level="DEBUG";
+    ignoreDebugFlag=false;
+  fi
+
+  logMsg $level "Runtime statistic for '$scriptName': '$runtime' seconds";
+}
+
+
+#---------------------------------------------------------
+#
+# Prints simple runtime statistics for a script by the
+# help of cmd 'times', as debug msg per default.
+#
+# NOTE: doesn't work for bash, but ksh and zsh
 #
 # Parameter
 #  $1: log level, causes to print stats regardless of 'DEBUG'
