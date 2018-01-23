@@ -302,12 +302,20 @@ List of functions provided to you by `log4bsh.sh`.
        In case the file doesn't exist, yet, or its parent directory does not
        exist, it will be created beforehand.
   *  Note:
-       This method blocks until 'Ctrl+C' is pressed or 'tail -f' is killed!
+       This method blocks until 'Ctrl+C' is pressed or 'tail -f' is killed or
+       function `hideLog` is called.
+  *  Parameter:
+       $1: boolean indicating to print the hint for 'Ctrl+c', default is true
+  *  Returns:
+       tail's PID
+
+* **`hideLog`**
+  *  Description:
+       Stops tail used for printing log on screen.
   *  Parameter:
        none
   *  Returns:
-       nothing
-
+       0 in all cases
 
 
 ## Function Hooks

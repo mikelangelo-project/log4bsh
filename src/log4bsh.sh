@@ -113,6 +113,9 @@
 # determine our base directory
 LOG4BSH_ABSOLUTE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)";
 
+# generate a random ID for the 'tail' pid file
+PID_FILE_ID=$(echo $(date +%N) | sha256sum | cut -d ' ' -f1 | cut -c 1-5)
+
 
 #----------------------------------------------------------------------------#
 #                                                                            #
@@ -317,6 +320,9 @@ fi
 # file free of duplicate messages.
 #
 REDIRECTION_ENABLED=false;
+
+# caches tail's pid (see showLog() + hideLog())
+PID_FILE="~/.log4bsh_tail_pid-$PID_FILE_ID";
 
 
 #----------------------------------------------------------------------------#
@@ -714,12 +720,13 @@ getCallerName() {
     process="$(log4bsh_mapName $process)";
   fi
 
+  # process is a forked function call ?
+  if [ -z "$process" ]; then
+    process="forked_proc";
+  fi
+
   # via SSH ?
   if $viaSSH; then
-    # process is a forked function call ?
-    if [ -n "$process" ]; then
-      process="forked_proc";
-    fi
     process="sshd:$process";
   fi
 
@@ -1108,17 +1115,24 @@ runTimeStats() {
 # to a commonly shared file.
 #
 # NOTE:
-# This method blocks until 'Ctrl+c' is pressed or 'tail -f' is killed.
+# This method blocks until 'Ctrl+c' is pressed or 'tail -f' is killed 
+# or function 'hideLog' is called.
 #
 # Parameter
-#  $1: boolean indicating to print the hint for 'Ctrl+c'
+#  $1: boolean indicating to print the hint for 'Ctrl+c', default is true
 #
 # Returns
-#  nothing
+#  tail's PID
 #
 showLog(){
+
+  if [ -e "$PIDFILE" ]; then
+    # abort, log already shown
+    return;
+  fi
+
   # ensure log file's dir exits
-  [ ! -f $LOG_FILE ] \
+  [ ! -f "$LOG_FILE" ] \
       && [ ! -d $(dirname "$LOG_FILE") ] \
       && mkdir -p $(dirname "$LOG_FILE") ];
   # ensure log file exists
@@ -1133,5 +1147,35 @@ showLog(){
   if $printHint; then
     echo "Opening logfile '$LOG_FILE'.\nPress 'Ctrl+c' to abort.";
   fi
-  tail -n1 -f $LOG_FILE;
+  tail -n1 -f "$LOG_FILE" \
+    & pid=$! \
+    && echo "$pid" > "$PID_FILE";
+  return $pid;
+}
+
+
+#---------------------------------------------------------
+#
+# Stops tail used for printing log on screen.
+#
+# Parameter
+#  n/a
+#
+# Returns
+#  0 in all cases
+#
+hideLog() {
+  # tail's PID cache file exists ?
+  if [ -e "$PID_FILE" ]; then
+    # get PID from cache file
+    tailPID="$(cat $PID_FILE)";
+    # tail still alive ?
+    if [ -n "$(ps aux | grep $tailPID)" ]; then
+      # kill quietly
+      kill "$tailPID" 2>/dev/null;
+    fi
+    # clean up PID cache file
+    rm -f "$PID_FILE";
+  fi
+  return 0;
 }
