@@ -114,7 +114,7 @@ However, there is no need to touch your scripts. If you want to modify the log
 level for a specific script, you can do so before executing your script from the
 outside by the help of environment variables .
 ```bash
- # set overall logging level to WARN, but for myScript.sh set it to TRACE
+ # set overall logging level to $LOG_LEVEL_WARN, but for myScript.sh set it to $LOG_LEVEL_TRACE
  export LOG_LEVEL="ALL:WARN,myScript.sh:TRACE";
  ./myScript.sh
 ```
@@ -138,17 +138,17 @@ logs messages.
 
 
 ## Log Levels
-There are 5 different log levels, in addition to `QUIET`, each one serving a specific purpose.
-Lowest level is `ERROR`, default level is `INFO` and most verbose log level is `TRACE`.
+There are 5 different log levels, in addition to `$LOG_LEVEL_QUIET`, each one serving a specific purpose.
+Lowest level is `$LOG_LEVEL_ERROR`, default level is `$LOG_LEVEL_INFO` and most verbose log level is `$LOG_LEVEL_TRACE`.
 
-| Log Level      | Purpose        |
-| :---              | :---          |
-| TRACE | Most detailed log output, use it to print all details relevant, e.g. content of generated files. |
-| DEBUG | More detailed output, use e.g. to indicate current step of processing. |
-| INFO | Info messages, the default log level. Always logged except log level `QUIET` is set. |
-| WARN | Warning messages, use it to indicate something is not as expected. Always logged, except log level `QUIET` is set. |
-| ERROR | Error messages, use it to indicate sth went wrong. Always logged, except log level `QUIET` is set. |
-| QUIET | Do not log any messages. |
+| Log Level            | String      | Purpose        |
+| :---                 | :---        | :-             |
+| `$LOG_LEVEL_TRACE` | `TRACE`    | Most detailed log output, use it to print all details relevant, e.g. content of generated files. |
+| `$LOG_LEVEL_DEBUG` | `DEBUG`    | More detailed output, use e.g. to indicate current step of processing. |
+| `$LOG_LEVEL_INFO`  | `INFO`     | Info messages, the default log level. Always logged except log level `QUIET` is set. |
+| `$LOG_LEVEL_WARN`  | `WARN`     | Warning messages, use it to indicate something is not as expected. Always logged, except log level `QUIET` is set. |
+| `$LOG_LEVEL_ERROR` | `ERROR`    | Error messages, use it to indicate sth went wrong. Always logged, except log level `QUIET` is set. |
+| `$LOG_LEVEL_QUIET` | `QUIET`    | Do not log any messages. |
 
 
 
@@ -164,14 +164,14 @@ and [Using a Configuration File](#using-a-configuration-file).
 | :---              | :---          |:---          |
 | `LOG4BSH_CONFIG_FILE` | Optional configuration file, overrides all others. | `undefined` |
 | `LOG_FILE` | Log file for messages. | `~/.log4bsh.log` |
-| `LOG_LEVEL` | Defines current level for log msgs, allows also to log specific scripts at a certain level | `undefined` (== `ALL:INFO`) |
+| `LOG_LEVEL` | Defines current level for log msgs, allows also to log specific scripts at a certain level | `undefined` (== `ALL:$LOG_LEVEL_INFO`) |
 | `LOG_ROTATE` | Flag indicating to use log rotate. | `TRUE` |
 | `MAX_LOG_SIZE` | Maximum size for log files in bytes. | `5242880` (= 5MB) |
 | `ABORT_ON_ERROR` | Flag indicating the default behavior for error messages |  `TRUE ` |
 | `PRINT_TO_STDOUT` | Flag indicating to print messages to log and `STDOUT` | `FALSE` |
 | `DATE_FORMAT` | Date format for log messages. | `+%Y-%m-%dT%H:%M:%S` |
 | `USE_COLORS` | Use colors for log messages | `TRUE` |
-| `COLORS` | Allows to override default colors for log levels. Associative array, with keys: TRACE,DEBUG,INFO,WARN,ERROR | `TRACE->lblue`, `DEBUG->blue`, `INFO->green`, `WARN->orange`, `ERROR->red` |
+| `COLORS` | Allows to override default colors for log levels. Associative array, with keys: TRACE,DEBUG,INFO,WARN,ERROR | `$LOG_LEVEL_TRACE->lblue`, `$LOG_LEVEL_DEBUG->blue`, `$LOG_LEVEL_INFO->green`, `$LOG_LEVEL_WARN->orange`, `$LOG_LEVEL_ERROR->red` |
 | `DEBUG` | Indicates to print msg at level 'DEBUG' or below. Ignored if LOG_LEVEL is set. | `FALSE` |
 | `TRACE` | Indicates to print msg at level 'TRACE' or below. Ignored if LOG_LEVEL is set. | `FALSE` |
 

@@ -199,6 +199,17 @@ LOG4BSH_LBLUE='\033[1;34m';
 LOG4BSH_NC='\033[0m'; # No Color
 
 
+#
+# Log levels
+#
+LOG_LEVEL_QUIET="QUIET";
+LOG_LEVEL_ERROR="ERROR";
+LOG_LEVEL_WARN="WARN";
+LOG_LEVEL_INFO="INFO";
+LOG_LEVEL_DEBUG="DEBUG";
+LOG_LEVEL_TRACE="TRACE";
+
+
 #----------------------------------------------------------------------------#
 #                                                                            #
 #                               DEFAULTS                                     #
@@ -291,20 +302,20 @@ fi
 if [ -z "${LOG4BSH_COLORS-}" ]; then
   declare -A LOG4BSH_COLORS;
 fi
-if [ -z "${LOG4BSH_COLORS['TRACE']-}" ]; then
-  LOG4BSH_COLORS["TRACE"]=$LOG4BSH_LBLUE;
+if [ -z "${LOG4BSH_COLORS[$LOG_LEVEL_TRACE]-}" ]; then
+  LOG4BSH_COLORS[$LOG_LEVEL_TRACE]=$LOG4BSH_LBLUE;
 fi
-if [ -z "${LOG4BSH_COLORS['DEBUG']-}" ]; then
-  LOG4BSH_COLORS["DEBUG"]=$LOG4BSH_BLUE;
+if [ -z "${LOG4BSH_COLORS[$LOG_LEVEL_DEBUG]-}" ]; then
+  LOG4BSH_COLORS[$LOG_LEVEL_DEBUG]=$LOG4BSH_BLUE;
 fi
-if [ -z "${LOG4BSH_COLORS['INFO']-}" ]; then
-  LOG4BSH_COLORS["INFO"]=$LOG4BSH_GREEN;
+if [ -z "${LOG4BSH_COLORS[$LOG_LEVEL_INFO]-}" ]; then
+  LOG4BSH_COLORS[$LOG_LEVEL_INFO]=$LOG4BSH_GREEN;
 fi
-if [ -z "${LOG4BSH_COLORS['WARN']-}" ]; then
-  LOG4BSH_COLORS["WARN"]=$LOG4BSH_ORANGE;
+if [ -z "${LOG4BSH_COLORS[$LOG_LEVEL_WARN]-}" ]; then
+  LOG4BSH_COLORS[$LOG_LEVEL_WARN]=$LOG4BSH_ORANGE;
 fi
-if [ -z "${LOG4BSH_COLORS['ERROR']-}" ]; then
-  LOG4BSH_COLORS["ERROR"]=$LOG4BSH_RED;
+if [ -z "${LOG4BSH_COLORS[$LOG_LEVEL_ERROR]-}" ]; then
+  LOG4BSH_COLORS[$LOG_LEVEL_ERROR]=$LOG4BSH_RED;
 fi
 
 
@@ -322,7 +333,7 @@ fi
 REDIRECTION_ENABLED=false;
 
 # caches tail's pid (see showLog() + hideLog())
-PID_FILE="~/.log4bsh_tail_pid-$PID_FILE_ID";
+PID_FILE="$(cd && pwd)/.log4bsh_tail_pid-$PID_FILE_ID";
 
 
 #----------------------------------------------------------------------------#
@@ -339,7 +350,8 @@ PID_FILE="~/.log4bsh_tail_pid-$PID_FILE_ID";
 #
 # Parameter
 #  $1: message's log level, one of
-#       'DEBUG','TRACE','INFO','WARN','ERROR'
+#       '$LOG_LEVEL_DEBUG','$LOG_LEVEL_TRACE','$LOG_LEVEL_INFO',
+#       '$LOG_LEVEL_WARN','$LOG_LEVEL_ERROR'
 #  $2: message to log
 #  $3: optional, print to stdout,
 #       if false, msg appears in log, only
@@ -379,7 +391,7 @@ _log() {
     # no filter defined check TRACE/DEBUG
     if $TRACE \
         || ($DEBUG && [ "$logLevel" != "TRACE" ]) \
-        || [[ "$logLevel" =~ ^(INFO|WARN|ERROR)$ ]]; then
+        || [[ "$logLevel" =~ ^($LOG_LEVEL_INFO|$LOG_LEVEL_WARN|$LOG_LEVEL_ERROR)$ ]]; then
       logTheMsg=true;
     fi
   elif [[ "$LOG_LEVEL" =~ $processName:?.*,? ]]; then
@@ -389,36 +401,36 @@ _log() {
     elif [[ "$LOG_LEVEL" =~ "$processName:$logLevel" ]]; then
       logTheMsg=true;
     elif [[ "$LOG_LEVEL" =~ "$processName:TRACE" ]] \
-        && [[ $logLevel =~ ^(TRACE|DEBUG|INFO|WARN|ERROR)$ ]]; then
+        && [[ $logLevel =~ ^($LOG_LEVEL_TRACE|$LOG_LEVEL_DEBUG|$LOG_LEVEL_INFO|$LOG_LEVEL_WARN|$LOG_LEVEL_ERROR)$ ]]; then
       logTheMsg=true;
     elif [[ "$LOG_LEVEL" =~ "$processName:DEBUG" ]] \
-        && [[ $logLevel =~ ^(DEBUG|INFO|WARN|ERROR)$ ]]; then
+        && [[ $logLevel =~ ^($LOG_LEVEL_DEBUG|$LOG_LEVEL_INFO|$LOG_LEVEL_WARN|$LOG_LEVEL_ERROR)$ ]]; then
       logTheMsg=true;
     elif [[ "$LOG_LEVEL" =~ "$processName:INFO" ]] \
-        && [[ $logLevel =~ ^(INFO|WARN|ERROR)$ ]]; then
+        && [[ $logLevel =~ ^($LOG_LEVEL_INFO|$LOG_LEVEL_WARN|$LOG_LEVEL_ERROR)$ ]]; then
       logTheMsg=true;
     elif [[ "$LOG_LEVEL" =~ "$processName:WARN" ]] \
-        && [[ $logLevel =~ ^(WARN|ERROR)$ ]]; then
+        && [[ $logLevel =~ ^($LOG_LEVEL_WARN|$LOG_LEVEL_ERROR)$ ]]; then
       logTheMsg=true;
     fi
   elif [[ "$LOG_LEVEL" =~ (ALL:)ALL,?.*$ ]] \
       || [[ "$LOG_LEVEL" =~ (ALL:)?$logLevel ]]; then
     logTheMsg=true;
-  elif [[ "$LOG_LEVEL" =~ ALL:QUIET,?.*$ ]]; then
+  elif [[ "$LOG_LEVEL" =~ ALL:$LOG_LEVEL_QUIET,?.*$ ]]; then
     logTheMsg=false;
   else
      # no direct match of log level, check if log level is below threshold
-    if [[ "$LOG_LEVEL" =~ (ALL:)?TRACE ]] \
-        && [[ $logLevel =~ ^(TRACE|DEBUG|INFO|WARN|ERROR)$ ]]; then
+    if [[ "$LOG_LEVEL" =~ (ALL:)?$LOG_LEVEL_TRACE ]] \
+        && [[ $logLevel =~ ^($LOG_LEVEL_TRACE|$LOG_LEVEL_DEBUG|$LOG_LEVEL_INFO|$LOG_LEVEL_WARN|$LOG_LEVEL_ERROR)$ ]]; then
       logTheMsg=true;
-    elif [[ "$LOG_LEVEL" =~ (ALL:)?:DEBUG ]] \
-        && [[ $logLevel =~ ^(DEBUG|INFO|WARN|ERROR)$ ]]; then
+    elif [[ "$LOG_LEVEL" =~ (ALL:)?:$LOG_LEVEL_DEBUG ]] \
+        && [[ $logLevel =~ ^($LOG_LEVEL_DEBUG|$LOG_LEVEL_INFO|$LOG_LEVEL_WARN|$LOG_LEVEL_ERROR)$ ]]; then
       logTheMsg=true;
-    elif [[ "$LOG_LEVEL" =~ (ALL:)?:INFO ]] \
-        && [[ $logLevel =~ ^(INFO|WARN|ERROR)$ ]]; then
+    elif [[ "$LOG_LEVEL" =~ (ALL:)?:$LOG_LEVEL_INFO ]] \
+        && [[ $logLevel =~ ^($LOG_LEVEL_INFO|$LOG_LEVEL_WARN|$LOG_LEVEL_ERROR)$ ]]; then
       logTheMsg=true;
-    elif [[ "$LOG_LEVEL" =~ (ALL:)?:WARN ]] \
-        && [[ $logLevel =~ ^(WARN|ERROR)$ ]]; then
+    elif [[ "$LOG_LEVEL" =~ (ALL:)?:$LOG_LEVEL_WARN ]] \
+        && [[ $logLevel =~ ^($LOG_LEVEL_WARN|$LOG_LEVEL_ERROR)$ ]]; then
       logTheMsg=true;
     fi
   fi
@@ -430,8 +442,8 @@ _log() {
   # for shorter log level names, prepend the log message with a space to
   # have all messages starting at the same point, more convenient to read
   # if there is anything set to debug or trace (skip if "level INFO, only")
-  if [[ $logLevel =~ ^(WARN|INFO)$ ]] \
-       && ([[ "${LOG_LEVEL-}" =~ (TRACE|DEBUG) ]] \
+  if [[ $logLevel =~ ^($LOG_LEVEL_WARN|$LOG_LEVEL_INFO)$ ]] \
+       && ([[ "${LOG_LEVEL-}" =~ ($LOG_LEVEL_TRACE|$LOG_LEVEL_DEBUG) ]] \
         || ([ -z ${LOG_LEVEL-} ] \
              && $DEBUG)); then
     logMsg=" $logMsg";
@@ -741,7 +753,7 @@ getCallerName() {
 # script.
 #
 # Parameter
-#  $1: optional, string log level; default is DEBUG
+#  $1: optional, string log level; default is $LOG_LEVEL_DEBUG
 #  $2: optional, boolean indicating to print to STDOUT
 #
 # Returns
@@ -782,7 +794,7 @@ logCaller() {
 # Logs parent script's cmd line, including arguments.
 #
 # Parameter
-#  $1: optional, string log level; default is DEBUG
+#  $1: optional, string log level; default is $LOG_LEVEL_DEBUG
 #  $2: optional, boolean indicating to print to STDOUT
 #
 # Returns
@@ -976,7 +988,9 @@ logErrorMsg() {
 # Logs a trace message.
 #
 # Parameter
-#  $1: Log level, one of: 'TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR'
+#  $1: Log level, one of: 
+#       '$LOG_LEVEL_TRACE', '$LOG_LEVEL_DEBUG', '$LOG_LEVEL_INFO',
+#       '$LOG_LEVEL_WARN', '$LOG_LEVEL_ERROR'
 #  $2: The message to log.
 #  $3: Optional boolean indicating to print to `STDOUT`.
 #
@@ -1027,7 +1041,7 @@ printRuntime() {
   local level;
   local ignoreDebugFlag;
   if [ $# -gt 2 ] \
-      && [[ $3 =~ ^(TRACE|DEBUG|INFO|WARN|ERROR)$ ]]; then
+      && [[ $3 =~ ^($LOG_LEVEL_TRACE|$LOG_LEVEL_DEBUG|$LOG_LEVEL_INFO|$LOG_LEVEL_WARN|$LOG_LEVEL_ERROR)$ ]]; then
     level=$1;
     ignoreDebugFlag=true;
   else
@@ -1062,7 +1076,7 @@ runTimeStats() {
   local level;
   local ignoreDebugFlag;
   if [ $# -gt 0 ] \
-      && [[ $1 =~ ^(TRACE|DEBUG|INFO|WARN|ERROR)$ ]]; then
+      && [[ $1 =~ ^($LOG_LEVEL_TRACE|$LOG_LEVEL_DEBUG|$LOG_LEVEL_INFO|$LOG_LEVEL_WARN|$LOG_LEVEL_ERROR)$ ]]; then
     level=$1;
     ignoreDebugFlag=true;
   else
@@ -1126,7 +1140,7 @@ runTimeStats() {
 #
 showLog(){
 
-  if [ -e "$PIDFILE" ]; then
+  if [ -e "$PID_FILE" ]; then
     # abort, log already shown
     return;
   fi
